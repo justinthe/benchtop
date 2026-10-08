@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pendulum Lab — benchtop</title>
+<meta name="description" content="Why a pendulum keeps time, and when it stops being exact.">
+<meta property="og:title" content="Pendulum Lab"><meta property="og:description" content="Why a pendulum keeps time, and when it stops being exact."><meta property="og:image" content="thumb.jpg">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { model, stepRK4 } from './model.js';
+
+const rad = d => d * Math.PI / 180, VIS = 0.6; // scene units per metre
+
+createExplainer({
+  slug: 'pendulum', kicker: 'Why swings keep time', title: 'Pendulum Lab',
+  hook: 'Big swing or small, a pendulum seems to take the same time. It is very nearly true — and the gap is the interesting part.',
+  type: 'explainer', fov: 38, bloom: .3, environmentIntensity: .35,
+
+  // ---------- Config ----------
+  state: { length: 1, gravity: 9.81, angle0: 30, damping: false },
+  model,
+  stats: [
+    { key: 'T', label: 'Period', unit: ' s', fmt: 2 },
+    { key: 'peak', label: 'Peak speed', unit: ' m/s', fmt: 2 },
+    { key: 'err', label: 'Formula error', unit: '%', fmt: 1 },
+  ],
+  narrate: (s, m) => `A <b class="c-a">${s.length.toFixed(2)} m</b> pendulum released from <b class="c-b">${s.angle0.toFixed(0)}°</b> where g is ${s.gravity.toFixed(2)} m/s² swings once every <b class="c-a">${m.T.toFixed(2)} s</b>. The textbook formula 2π√(L/g) says ${m.T0.toFixed(2)} s, so it is off by <b class="c-c">${m.err.toFixed(1)}%</b>${s.angle0 < 15 ? ' — at small angles it barely matters' : ', because a wide swing climbs a flatter part of the arc'}.`,
+  controls: [
+    { type: 'slider', key: 'length', label: 'Length', min: .3, max: 2, step: .01, unit: ' m', fmt: 2, keys: ['[', ']'] },
+    { type: 'slider', key: 'gravity', label: 'Gravity', min: 1.5, max: 25, step: .01, unit: ' m/s²', fmt: 2, keys: ['-', '='] },
+    { type: 'slider', key: 'angle0', label: 'Release angle', min: 5, max: 120, step: 1, unit: '°', fmt: 0, keys: [',', '.'] },
+    { type: 'toggle', key: 'damping', label: 'Air drag', options: ['Off', 'On'], keys: ['D'] },
+  ],
+  modes: [
+    { name: 'Small swing', state: { length: 1, gravity: 9.81, angle0: 8, damping: false }, camera: 'lab', caption: 'Small angles: the clock-maker\'s regime' },
+    { name: 'Big swing', state: { length: 1, gravity: 9.81, angle0: 100, damping: false }, camera: 'close', caption: 'Wide swings run slow' },
+    { name: 'On the Moon', state: { length: 1, gravity: 1.62, angle0: 20, damping: false }, camera: 'studio', caption: 'Same rod, one-sixth gravity' },
+  ],
+  views: {
+    lab: { label: 'Lab', pos: [1.6, 1.9, 4.6], target: [0, 1.35, 0] },
+    close: { label: 'Close', pos: [0, 1.5, 2.9], target: [0, 1.45, 0] },
+    studio: { label: 'Studio', pos: [2.4, 2.7, 3.0], target: [.1, 1.3, 0] },
+  },
+  labels: [
+    { anchor: r => r.lenAnchor, text: s => `Length ${s.length.toFixed(2)} m`, priority: 2 },
+    { anchor: r => r.angAnchor, text: s => `Release ${s.angle0.toFixed(0)}°`, priority: 1 },
+    { anchor: r => r.bobAnchor, text: (s, m) => `T ${m.T.toFixed(2)} s`, priority: 3 },
+  ],
+  screens: [{
+    mesh: r => r.screen, size: [640, 380], live: true,
+    draw(ctx, s, m, r, w, h) {
+      const { chart } = r.kit, pad = { x: 76, y: 40 }, area = { x: pad.x, y: pad.y, w: w - pad.x - 20, h: h - pad.y - 36 };
+      chart.clear(ctx, w, h); chart.grid(ctx, area, 6, 4);
+      const amp = Math.max(s.angle0, 10) * 1.15, range = { x: [-6, 0], y: [-amp, amp] };
+      ctx.setLineDash([6, 6]); for (const a of [s.angle0, -s.angle0]) chart.line(ctx, area, [-6, 0], [a, a], range, { color: 'rgba(255,180,84,.5)', width: 2 }); ctx.setLineDash([]);
+      chart.line(ctx, area, r.hist.map(p => p.t - r.t), r.hist.map(p => p.deg), range, { color: '#7fd3ff', width: 5 });
+      chart.text(ctx, 'ANGLE vs TIME', pad.x, 26, { size: 22, color: '#cfe3f0' });
+      chart.text(ctx, `${(r.sim.th * 180 / Math.PI).toFixed(0)}°`, w - 20, 26, { size: 22, color: '#7fd3ff', align: 'right' });
+      chart.text(ctx, `+${amp.toFixed(0)}°`, pad.x - 8, pad.y + 10, { size: 18, color: '#cfe3f0', align: 'right' });
+      chart.text(ctx, `−${amp.toFixed(0)}°`, pad.x - 8, pad.y + area.h, { size: 18, color: '#cfe3f0', align: 'right' });
+      chart.text(ctx, '−6 s', area.x, h - 12, { size: 18, color: '#cfe3f0' }); chart.text(ctx, 'now', area.x + area.w, h - 12, { size: 18, color: '#cfe3f0', align: 'right' });
+    },
+  }],
+  sound: { ambient: 'room', ui: true },
+  assumptions: `A rigid massless rod and a point bob. Period uses the exact large-angle result T = 2π√(L/g) / AGM(1, cos(θ₀/2)); the "formula error" compares it with the small-angle T₀ = 2π√(L/g). Motion is integrated with RK4 from θ'' = −(g/L) sin θ (− c·θ' with air drag on). Scene length is scaled 0.6 units per metre.`,
+  occluders: r => [r.bob],
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit;
+    const room = kit.room({ w: 9, d: 7 }); room.position.z = -.5; scene.add(room);
+    const bench = kit.bench({ w: 3.6, d: 1.5, h: .8 }); scene.add(bench);
+    const win = kit.windowLight({ from: [2.6, 3.4, -5.2], intensity: 2.2 }); win.group.position.set(1.9, 1.9, -3.98); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 9, 9, 2); lamp.position.set(-2.2, 2.4, 1.6); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .25));
+    const shelf = kit.shelf(); shelf.position.set(-2.5, 0, -3.2); scene.add(shelf);
+    const plant = kit.plant({ h: .7 }); plant.position.set(-1.35, .8, -.35); scene.add(plant);
+    const plant2 = kit.plant({ h: 1.0, leaves: 11 }); plant2.position.set(-3.5, 0, -2.6); scene.add(plant2);
+
+    // rig: base plate, post, arm, pivot
+    const PIV = 2.25;
+    const base = kit.roundedBox(1.6, .04, .7, .015, mat.metal(0x6f757c, .45)); base.position.set(-.2, .82, 0); scene.add(base);
+    const post = kit.roundedBox(.07, PIV - .8, .07, .01, mat.metal(0xb8bcc2, .3)); post.position.set(-.8, (PIV + .8) / 2, -.05); scene.add(post);
+    const arm = kit.roundedBox(.9, .06, .07, .012, mat.metal(0xb8bcc2, .3)); arm.position.set(-.38, PIV + .02, -.05); scene.add(arm);
+
+    const pend = new THREE.Group(); pend.position.set(0, PIV, 0); scene.add(pend);
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(.008, .008, 1, 12), mat.metal(0xd8dce0, .25)); rod.castShadow = true; pend.add(rod);
+    const bob = new THREE.Mesh(new THREE.SphereGeometry(.07, 32, 24), mat.metal(0xc9a45c, .22)); bob.castShadow = true; pend.add(bob);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, .09, 16), mat.metal(0x8a8f95, .3)); pin.rotation.x = Math.PI / 2; pin.position.z = -.02; pend.add(pin);
+
+    // protractor arc + release marker
+    const R = .55, arc = new THREE.Mesh(new THREE.TorusGeometry(R, .006, 8, 96, Math.PI), mat.emissive(0x7fd3ff, .8));
+    arc.rotation.z = Math.PI; arc.position.set(0, PIV, -.04); scene.add(arc);
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(.022, 16, 12), mat.emissive(0xffb454, 2.5)); marker.position.z = -.04; pend.parent.add(marker);
+
+    const lenAnchor = kit.anchor(.07, 0, 0), bobAnchor = kit.anchor(0, -.12, 0), angAnchor = kit.anchor(0, .06, 0);
+    pend.add(lenAnchor, bobAnchor); marker.add(angAnchor);
+
+    // display on stand
+    const { group: disp, screen } = kit.screenBezel(1.1, .65);
+    disp.position.set(1.2, .8 + .55, -.15); disp.rotation.y = -.4; scene.add(disp);
+    const stand = kit.roundedBox(.08, .45, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(1.2, .8 + .225, -.2); scene.add(stand);
+    const foot = kit.roundedBox(.5, .03, .35, .01, mat.metal(0x6f757c, .4)); foot.position.set(1.2, .815, -.18); foot.rotation.y = -.4; scene.add(foot);
+
+    return { pend, rod, bob, marker, lenAnchor, bobAnchor, angAnchor, screen, PIV, R, kit, sim: { th: rad(30), om: 0 }, a0: null, hist: [], t: 0 };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m, dt, t) {
+    if (r.a0 !== s.angle0) { r.sim.th = rad(s.angle0); r.sim.om = 0; r.a0 = s.angle0; r.hist.length = 0; }
+    const h = Math.min(dt, .05), n = Math.max(1, Math.ceil(h / .004)), c = s.damping ? .25 : 0;
+    for (let i = 0; i < n; i++) [r.sim.th, r.sim.om] = stepRK4(r.sim.th, r.sim.om, h / n, s.gravity, s.length, c);
+    r.t = t; r.hist.push({ t, deg: r.sim.th * 180 / Math.PI }); while (r.hist.length && r.hist[0].t < t - 6) r.hist.shift();
+
+    const Lv = s.length * VIS;
+    r.pend.rotation.z = r.sim.th; r.rod.scale.y = Lv; r.rod.position.y = -Lv / 2; r.bob.position.y = -Lv;
+    r.lenAnchor.position.y = -Lv / 2; r.bobAnchor.position.y = -Lv - .06;
+    const a = rad(s.angle0); r.marker.position.set(Math.sin(a) * r.R, r.PIV - Math.cos(a) * r.R, -.04);
+  },
+});
+</script>
+</body>
+</html>
