@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prism Room — benchtop</title>
+<meta name="description" content="Why white light splits in a prism: refraction, minimum deviation, total internal reflection, and putting the colours back together.">
+<meta property="og:title" content="Prism Room"><meta property="og:description" content="Why white light splits in a prism."><meta property="og:image" content="thumb.jpg">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { wavelengthToRGB } from '../lib/pure.js';
+import { model, layout, BANDS, SIDE, SCREEN_R, BASE_INCIDENCE, minDevIncidence, tirIncidence, index } from './model.js';
+
+const rad = d => d * Math.PI / 180, BEAM_Y = 1.1, WAIT = [2.25, -1.25], f1 = v => (Number.isFinite(v) ? v.toFixed(1) : '—');
+const lerpAngle = (a, b, t) => a + (((b - a + 540) % 360) - 180) * t;
+
+createExplainer({
+  slug: 'prism-room', kicker: 'Where white light splits', title: 'Prism Room',
+  hook: 'White light looks simple until glass slows each colour by a different amount. Turn the prism and watch the fan open, shrink, and finally get trapped.',
+  type: 'explainer', fov: 38, bloom: .3, bloomThreshold: 1.0, environmentIntensity: .4,
+
+  // ---------- Config ----------
+  state: { prism: 0, light: 0, second: false },
+  model,
+  stats: [
+    { key: 'incidence', label: 'Incidence', unit: '°', fmt: 1 },
+    { key: 'deviation', label: 'Deviation', unit: '°', fmt: 1 },
+    { key: 'spread', label: 'Spread', unit: '°', fmt: 1 },
+  ],
+  narrate: (s, m) => {
+    let t = `White light enters the glass at <b class="c-a">${f1(m.incidence)}°</b>`;
+    if (m.allTrapped) t += ' but cannot get out: every colour stays trapped by total internal reflection.';
+    else if (m.tirCount === BANDS.length) t += `. At that angle no colour can leave through the far face: all seven are totally reflected and exit through the base instead, bent by <b class="c-b">${f1(m.deviation)}°</b>.`;
+    else if (s.second && m.deviation < .1) t += '. The second, inverted prism undoes the bend: every colour leaves parallel to the original beam, so the fan collapses back into white (deviation <b class="c-b">0.0°</b>, spread <b class="c-c">0.0°</b>).';
+    else {
+      t += ` and leaves bent by <b class="c-b">${f1(m.deviation)}°</b>. Violet slows most, so the colours fan out by <b class="c-c">${f1(m.spread)}°</b>.`;
+      if (m.tirCount > 0) t += ` ${m.tirCount} of 7 colours hit the exit face too steeply (violet first) and are reflected back inside.`;
+    }
+    return t;
+  },
+  controls: [
+    { type: 'slider', key: 'prism', label: 'Prism', min: -10, max: 30, step: .1, unit: '°', fmt: 1, keys: ['[', ']'] },
+    { type: 'slider', key: 'light', label: 'Light arm', min: -8, max: 8, step: .1, unit: '°', fmt: 1, keys: [';', "'"] },
+    { type: 'toggle', key: 'second', label: 'Second prism', options: ['Waiting', 'In'], keys: ['P'] },
+  ],
+  modes: [
+    { name: 'Split', state: { prism: 0, light: 0, second: false }, camera: 'lab', caption: 'One beam in, a fan out' },
+    { name: 'Least bend', state: { prism: BASE_INCIDENCE - minDevIncidence(), light: 0, second: false }, camera: 'exploded', caption: 'Minimum deviation: the beam runs parallel to the base inside' },
+    { name: 'Trapped', state: { prism: BASE_INCIDENCE - 45, light: 0, second: false }, camera: 'exploded', caption: 'Too steep: total internal reflection' },
+    { name: 'Rejoin', state: { prism: 0, light: 0, second: true }, camera: 'studio', caption: 'A mirror-image prism recombines the colours' },
+  ],
+  views: {
+    lab: { label: 'Lab', pos: [1.2, 2.3, 3.2], target: [-.05, 1.0, -.4] },
+    exploded: { label: 'Exploded', pos: [-.1, 5.2, .5], target: [-.2, 1.0, -.6] },
+    studio: { label: 'Studio', pos: [.1, 1.6, 2.7], target: [.45, 1.1, -.1] },
+  },
+  labels: [
+    { anchor: r => r.entryAnchor, text: (s, m) => `Incidence ${f1(m.incidence)}°`, priority: 3 },
+    { anchor: r => r.exitAnchor, text: (s, m) => `Deviation ${f1(m.deviation)}°`, show: (s, m) => Number.isFinite(m.deviation), priority: 4,
+      info: (s, m) => `Violet and red bend by different amounts. The smallest bend for 589 nm light is <b>${m.minDev.toFixed(1)}°</b>, reached at <b>${m.minDevIncidence.toFixed(1)}°</b> incidence, when the ray inside runs parallel to the prism base. Turn the prism through that angle and the deviation rises on both sides.` },
+    { anchor: r => r.cardAnchor, text: (s, m) => `Spread ${f1(m.spread)}°`, show: (s, m) => Number.isFinite(m.spread) && !m.allTrapped, priority: 2 },
+    { anchor: r => r.tirAnchor, text: (s, m) => `Trapped ×${m.tirCount}`, show: (s, m) => m.tirCount > 0 && !!m.tirPoint, priority: 5 },
+  ],
+  screens: [
+    { mesh: r => r.cardScreen, size: [540, 330], draw: drawCard },
+    { mesh: r => r.monScreen, size: [660, 390], draw: drawCurve },
+  ],
+  sound: { ambient: 'machine', ui: true },
+  assumptions: `Glass is Schott N-SF11 (Sellmeier dispersion), apex 60°. Every beam is traced in the bench plane with the vector form of Snell's law, reflecting when refraction is impossible (total internal reflection, up to 16 interactions). Incidence, deviation and spread are measured from those traced rays; deviation uses 589 nm and spread is the difference between the most and least bent colours. The light arm is aimed at the middle of the first face. The screen sits on an arm that swings to follow the 589 nm exit ray. The second prism is the same glass, turned 180°, parallel to the first prism's exit face with a 2 cm gap, and auto-aligns on its own stage. Surface reflections (Fresnel) are ignored.`,
+  onTier(r, tier) { if (r.prism) r.prism.material = r.p2.material = tier === 'low' ? r.glassLow : r.glassHigh; },
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit;
+    const room = kit.room({ w: 11, d: 8, wall: 0x7d6e60 }); room.position.z = -.3; scene.add(room);
+    const bench = kit.bench({ w: 5.6, d: 4.0, h: .8 }); scene.add(bench);
+    const plate = kit.roundedBox(5.3, .02, 3.7, .008, mat.matte(0x1c1a19, .55)); plate.position.y = .81; scene.add(plate);
+    const win = kit.windowLight({ from: [3, 3.6, -7], intensity: 1.3, w: 1.8, h: 1.9 }); win.group.position.set(2.8, 2.1, -4.27); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 7, 10, 2); lamp.position.set(-3.2, 2.6, 1.5); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .15));
+    const shelf = kit.shelf({ w: 1.8, h: 1.5 }); shelf.position.set(-3.3, 0, -4.0); scene.add(shelf);
+    const plant = kit.plant({ h: 1.0, leaves: 11 }); plant.position.set(-4.3, 0, -3.0); scene.add(plant);
+    const plant2 = kit.plant({ h: .55 }); plant2.position.set(-2.4, .81, -1.2); scene.add(plant2);
+    scene.add(Object.assign(kit.cable([-2.3, .82, .2], [-3.0, .82, 1.0], .02), {}));
+
+    // glass: prism extruded along scene y, model (u,v) -> scene (x,z)
+    const h = SIDE * Math.sqrt(3) / 2, tri = new THREE.Shape([new THREE.Vector2(0, 2 * h / 3), new THREE.Vector2(-SIDE / 2, -h / 3), new THREE.Vector2(SIDE / 2, -h / 3)]);
+    const geo = new THREE.ExtrudeGeometry(tri, { depth: .4, bevelEnabled: false }); geo.translate(0, 0, -.2); geo.rotateX(Math.PI / 2);
+    const glassHigh = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 1, thickness: .5, ior: 1.78, dispersion: 6, roughness: 0, metalness: 0, envMapIntensity: 2.2, specularIntensity: 1, attenuationColor: 0xcfe8ff, attenuationDistance: 3 });
+    const glassLow = kit.mat.glass(0xcfeaff, .3);
+    const prism = new THREE.Mesh(geo, glassHigh), p2 = new THREE.Mesh(geo, glassHigh);
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: .55 });
+    for (const p of [prism, p2]) { p.castShadow = true; p.position.y = BEAM_Y; p.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat)); scene.add(p); }
+
+    // rotation stage under the prism (turns with it) + stage for the second prism
+    const mkStage = () => {
+      const g = new THREE.Group(), base = kit.roundedBox(.5, .04, .5, .02, mat.metal(0x3a3d41, .5)); base.position.y = .84; g.add(base);
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(.27, .27, .06, 48), mat.metal(0x8a8f95, .6)); disc.position.y = .89; disc.castShadow = true; g.add(disc);
+      const tick = new THREE.Mesh(new THREE.BoxGeometry(.08, .012, .014), mat.emissive(0xffb454, 1.5)); tick.position.set(.23, .032, 0); disc.add(tick); disc.userData.tick = tick;
+      return { g, disc };
+    };
+    const st1 = mkStage(), st2 = mkStage(); scene.add(st1.g, st2.g);
+
+    // collimator (light source) – goes where the model says, aimed down the beam
+    const src = new THREE.Group();
+    const body = kit.roundedBox(.5, .26, .26, .03, mat.plastic(0x2b2f36, .4)); body.position.set(-.27, BEAM_Y, 0); src.add(body);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .06, 24), mat.emissive(0xfff3d6, 3)); lens.rotation.z = Math.PI / 2; lens.position.set(-.02, BEAM_Y, 0); src.add(lens);
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(.07, .09, BEAM_Y - .81 - .13, 16), mat.metal(0x6f757c, .4)); ped.position.set(-.27, (BEAM_Y + .81 - .13) / 2, 0); ped.castShadow = true; src.add(ped);
+    const knob = kit.knob(.05, .04, 0xd9d4cb); knob.position.set(-.35, BEAM_Y + .13, 0); src.add(knob);
+    scene.add(src);
+
+    // screen arm tracks the exit ray; card carries the diegetic spectrum
+    const arm = new THREE.Group(); arm.position.y = 0; scene.add(arm);
+    const rail = kit.roundedBox(SCREEN_R + .3, .02, .035, .006, mat.metal(0x3a3d41, .4)); rail.position.set((SCREEN_R + .3) / 2 - .15 + .2, .83, 0); arm.add(rail);
+    const post = kit.roundedBox(.05, .3, .05, .01, mat.metal(0x6f757c, .4)); post.position.set(SCREEN_R + .06, .97, 0); arm.add(post);
+    const { group: card, screen: cardScreen } = kit.screenBezel(.9, .55, { depth: .03, border: .025, color: 0xe8e4dc });
+    card.position.set(SCREEN_R + .06, BEAM_Y + .05, 0); card.rotation.y = -Math.PI / 2; arm.add(card);
+    const cardAnchor = kit.anchor(0, .38, 0); card.add(cardAnchor);
+
+    // monitor with the deviation curve
+    const { group: mon, screen: monScreen } = kit.screenBezel(.84, .5, { depth: .05 });
+    mon.position.set(1.25, .8 + .38, .95); mon.rotation.y = -.45; scene.add(mon);
+    const stand = kit.roundedBox(.07, .34, .05, .01, mat.metal(0x6f757c, .4)); stand.position.set(1.25, .8 + .17, .9); stand.rotation.y = -.45; scene.add(stand);
+    const foot = kit.roundedBox(.5, .03, .32, .01, mat.metal(0x6f757c, .4)); foot.position.set(1.25, .815, .93); foot.rotation.y = -.45; scene.add(foot);
+
+    // beams: one white feed + one per band
+    const white = kit.beam(0xffffff, .006, { boost: 1.5 }), bands = BANDS.map(nm => kit.beam(new THREE.Color(...wavelengthToRGB(nm)), .0045, { boost: 1.25 }));
+    [white, ...bands].forEach(b => { b.renderOrder = 10; scene.add(b); });
+
+    const entryAnchor = kit.anchor(), exitAnchor = kit.anchor(), tirAnchor = kit.anchor(); scene.add(entryAnchor, exitAnchor, tirAnchor);
+    return { prism, p2, st1, st2, src, knob, arm, white, bands, glassHigh, glassLow, entryAnchor, exitAnchor, tirAnchor, cardAnchor, cardScreen, monScreen, lift: 1, psi: 0, lastM: null, kit };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m, dt) {
+    const to3 = p => [p[0], BEAM_Y, p[1]];
+    // glass + stages
+    const pose = m.prisms[0];
+    r.prism.position.set(pose.c[0], BEAM_Y, pose.c[1]); r.prism.rotation.y = -rad(pose.phi);
+    r.st1.disc.rotation.y = -rad(pose.phi); r.st1.g.position.set(pose.c[0], 0, pose.c[1]);
+    const p2 = layout({ ...s, second: true }).prisms[1];
+    // second prism rides from its parking spot (back-right corner) onto its stage
+    r.lift += ((s.second ? 0 : 1) - r.lift) * Math.min(1, dt * 5);
+    const k = r.lift, px = p2.c[0] + (WAIT[0] - p2.c[0]) * k, pz = p2.c[1] + (WAIT[1] - p2.c[1]) * k;
+    r.p2.position.set(px, BEAM_Y + Math.sin(k * Math.PI) * .25, pz); r.p2.rotation.y = -rad(p2.phi);
+    r.st2.disc.rotation.y = -rad(p2.phi); r.st2.g.position.set(px, 0, pz);
+
+    // collimator
+    r.src.position.set(m.origin[0], 0, m.origin[1]); r.src.rotation.y = -rad(s.light); r.knob.rotation.y = -rad(s.light) * 4;
+
+    // screen arm follows the exit ray (smoothed so jumps swing instead of snapping)
+    r.psi = lerpAngle(r.psi, m.screen.angle, Math.min(1, dt * 8)); r.arm.rotation.y = -rad(r.psi);
+
+    // beams + anchors only when the model result changed
+    if (r.lastM !== m) {
+      r.lastM = m;
+      r.white.setPath(m.entry ? [to3(m.origin), to3(m.entry)] : [to3(m.origin), to3([m.origin[0] + 3 * Math.cos(rad(s.light)), m.origin[1] + 3 * Math.sin(rad(s.light))])]);
+      m.paths.forEach((p, i) => r.bands[i].setPath(p.pts.slice(1).map(to3)));
+      const set = (an, p, dx = 0, dy = .06, dz = 0) => { if (p) an.position.set(p[0] + dx, BEAM_Y + dy, p[1] + dz); };
+      set(r.entryAnchor, m.entry, -.2, .22); set(r.exitAnchor, m.exit, .22, .18, -.05); set(r.tirAnchor, m.tirPoint, 0, .3);
+    }
+  },
+});
+
+// ---------- Screens ----------
+function drawCard(ctx, s, m, r, w, h) {
+  ctx.fillStyle = '#ddd9d0'; ctx.fillRect(0, 0, w, h);
+  const W = .9, cx = w / 2, px = l => cx + l / W * w;
+  const lat = m.screen.lateral.map((l, i) => ({ l, nm: BANDS[i] })).filter(b => b.l !== null);
+  ctx.fillStyle = '#26231f'; ctx.fillRect(0, h * .18, w, h * .5); // dark band: colours add up inside it, overlap goes white
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  lat.forEach(b => {
+    const [R, G, B] = wavelengthToRGB(b.nm).map(c => Math.round(c * 255)), x = px(b.l);
+    const g = ctx.createLinearGradient(x - 26, 0, x + 26, 0); g.addColorStop(0, `rgba(${R},${G},${B},0)`); g.addColorStop(.5, `rgba(${R},${G},${B},.75)`); g.addColorStop(1, `rgba(${R},${G},${B},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - 26, h * .18, 52, h * .5);
+  });
+  ctx.restore();
+  ctx.fillStyle = '#3a342d'; ctx.font = '600 20px JetBrains Mono, monospace'; ctx.textAlign = 'left';
+  ctx.fillText(s.second ? 'RECOMBINED' : m.allTrapped ? 'NO LIGHT OUT' : 'SCREEN', 18, 34);
+  ctx.font = '16px JetBrains Mono, monospace'; ctx.textAlign = 'right';
+  ctx.fillText(Number.isFinite(m.spread) ? `spread ${m.spread.toFixed(1)}°` : '', w - 18, 34);
+  // 400..700 nm reference strip along the bottom
+  ctx.textAlign = 'left'; ctx.fillStyle = '#6b6358'; ctx.fillText('400', 18, h - 12); ctx.textAlign = 'right'; ctx.fillText('700 nm', w - 18, h - 12);
+  r.kit.chart.spectrum(ctx, { x: 18, y: h - 46, w: w - 36, h: 14 });
+}
+
+function drawCurve(ctx, s, m, r, w, h) {
+  const { chart } = r.kit, pad = { l: 78, t: 56, r: 24, b: 54 }, a = { x: pad.l, y: pad.t, w: w - pad.l - pad.r, h: h - pad.t - pad.b };
+  const X = i => a.x + (i - 30) / 60 * a.w, Y = d => a.y + a.h - (d - 60) / 30 * a.h;
+  chart.clear(ctx, w, h); chart.grid(ctx, a, 6, 6);
+  // violet TIR zone
+  const tv = tirIncidence(400); ctx.fillStyle = 'rgba(255,122,144,.16)'; ctx.fillRect(a.x, a.y, X(tv) - a.x, a.h);
+  chart.text(ctx, 'TRAPPED', a.x + 8, a.y + 24, { size: 17, color: '#ff7a90' });
+  // curve
+  ctx.strokeStyle = '#7fd3ff'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.beginPath(); let pen = false;
+  for (const p of m.curve) { if (!Number.isFinite(p.dev) || p.dev > 90) { pen = false; continue; } const x = X(p.inc), y = Y(p.dev); pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true; }
+  ctx.stroke();
+  // minimum
+  ctx.setLineDash([7, 7]); ctx.strokeStyle = 'rgba(255,180,84,.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x, Y(m.minDev)); ctx.lineTo(a.x + a.w, Y(m.minDev)); ctx.stroke(); ctx.setLineDash([]);
+  chart.text(ctx, `min ${m.minDev.toFixed(1)}°`, a.x + a.w, Y(m.minDev) - 9, { size: 17, color: '#ffb454', align: 'right' });
+  // current point
+  const inc = m.incidence;
+  if (Number.isFinite(inc)) {
+    const x = X(Math.min(90, Math.max(30, inc))), ok = Number.isFinite(m.deviation), y = ok ? Y(m.deviation) : a.y + a.h;
+    ctx.fillStyle = ok ? '#ffffff' : '#ff7a90'; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, a.y + a.h); ctx.lineTo(x, y); ctx.stroke();
+  }
+  chart.text(ctx, 'DEVIATION vs INCIDENCE  (589 nm)', pad.l, 34, { size: 21, color: '#cfe3f0' });
+  for (const d of [60, 70, 80, 90]) chart.text(ctx, `${d}°`, a.x - 10, Y(d) + 6, { size: 17, color: '#cfe3f0', align: 'right' });
+  for (const i of [30, 45, 60, 75, 90]) chart.text(ctx, `${i}°`, X(i), h - 20, { size: 17, color: '#cfe3f0', align: 'center' });
+}
+</script>
+</body>
+</html>

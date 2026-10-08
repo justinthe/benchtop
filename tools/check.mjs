@@ -1,6 +1,6 @@
 // Runtime logic checks: node tools/check.mjs
 import assert from 'node:assert/strict';
-import { createStore, tweenState, encodeHash, decodeHash, pickTier, tierDown, ease, clamp } from '../lib/pure.js';
+import { createStore, tweenState, encodeHash, decodeHash, pickTier, tierDown, ease, clamp, wavelengthToRGB } from '../lib/pure.js';
 
 // store: model recomputes on set, subscribers fire once per flush, no-op set stays clean
 const st = createStore({ a: 1, b: 2 }, s => ({ sum: s.a + s.b }));
@@ -29,4 +29,9 @@ assert.equal(pickTier({ gpu: 'Google SwiftShader' }), 'low');
 assert.equal(pickTier({ mobile: true, cores: 6 }), 'low');
 assert.equal(pickTier({ cores: 12 }), 'high');
 assert.equal(tierDown('high'), 'med'); assert.equal(tierDown('low'), 'low');
+// wavelength colors: red/green/blue dominant, out-of-range is black
+const [r6, g6, b6] = wavelengthToRGB(650); assert.ok(r6 > .9 && g6 < .3 && b6 === 0);
+const [r5, g5] = wavelengthToRGB(540); assert.ok(g5 > r5 && g5 > .9);
+const [, , b4] = wavelengthToRGB(460); assert.ok(b4 > .9);
+assert.deepEqual(wavelengthToRGB(900), [0, 0, 0]);
 console.log('check ok');

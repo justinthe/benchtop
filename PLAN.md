@@ -71,7 +71,7 @@ Built in this order; each step is visible in the demo page before moving on.
 - Export pure helpers (`createStore`, `tweenState`, `encodeHash`, `decodeHash`, `pickTier`) so `tools/check.mjs` imports them without DOM.
 
 ### 2.3 Renderer + post-FX
-- WebGL2, `ACESFilmicToneMapping`, sRGB output, `PCFSoftShadowMap`, PMREM from `RoomEnvironment`.
+- WebGL2, `ACESFilmicToneMapping`, sRGB output, `PCFShadowMap`, PMREM from `RoomEnvironment`.
 - Composer: Render → GTAO (high only) → UnrealBloom → SMAA (high/med) or FXAA (low) → custom vignette+grain `ShaderPass` → Output.
 - DPR cap: high 2, med 1.5, low 1. Shadow map: high 2048, med/low 1024; low disables GTAO + bloom resolution halved.
 
@@ -133,14 +133,161 @@ Also `kit.mat.{glass, metal, matte, emissive, plastic}(color)` presets.
 
 ## 3. M2 — Golden examples
 
-| Page | Type | Topic file | Scene |
-|---|---|---|---|
-| `prism-room/` | Explainer | `topics/prism-room.md` | Optics console in sunlit room; triangular prism (N-SF11 via Sellmeier), white beam → 7-band fan; second prism toggle; diegetic deviation-vs-incidence curve + spectrum screen. Modes: Split / Least bend / Trapped (TIR) / Rejoin. Views: Lab / Exploded / Studio. |
-| `river-delta/` (proposed; swap if owner prefers) | World | `topics/river-delta.md` | Tilted diorama on plinth; procedural terrain + river channel, sea level + discharge sliders, time-of-day toggle, hotspots as info pills. |
+Two hand-built pages at sael.net quality, plus the small runtime additions they force. Owner reviews each before the next starts.
 
-Each gets `model.js` + `model.test.mjs` + `meta.json` + `thumb.jpg`. Owner reviews screenshots; iterate until "happy with look". Everything learned → `STYLE.md` + `PATTERNS.md` drafts.
+**Status (2026-10-08):** 3.0 done. 3.1 `prism-room` built and verified, awaiting owner review. 3.2 `river-delta` not started.
 
-**Done when:** owner signs off on both.
+### 3.0 Runtime additions (do first, small)
+
+| Change | Where | Why |
+|---|---|---|
+| `onTier(refs, tier)` hook, called on every tier change | `explainer.js` | Prism glass uses transmission + dispersion on high/med and plain transparent glass on low. |
+| Label `show(s,m)` toggle + clickable info labels: `labels[].info: (s,m) => html`. The pill gets `pointer-events: auto`, opens on click or Enter, and only one stays open at a time | `explainer.js`, `explainer.css` | Hotspots for the World page (PRD §8). |
+| `kit.beam(color, width)` → mesh with `.setPath(points)`. It rebuilds a flat camera-facing ribbon only when the path changes. Emissive and additive, so bloom makes it glow | `kit.js` | Light rays (prism), reusable for flows and paths later. |
+| `kit.chart.spectrum(ctx, rect)` + `wavelengthToRGB` (in `pure.js`, unit-tested) | `kit.js` | Prism screen, and later optics topics such as spectacles. |
+| `tools/serve.py` replaces `serve.sh` (run `python3 tools/serve.py`): static server plus `POST /__thumb/<slug>`, which writes `<slug>/thumb.jpg`. Binds to 127.0.0.1 only and rejects slugs that don't match `^[a-z0-9-]+$` | `tools/` | Thumbnails get to disk without passing huge base64 strings through the chat. |
+| `__bt.saveThumb()` → posts `thumb()` to that endpoint | `explainer.js` | Same. |
+| Pendulum gets `meta.json` + `thumb.jpg` | `pendulum/` | Same format as the golden pages. |
+
+`meta.json` shape (feeds the v2 gallery):
+```json
+{ "slug": "prism-room", "title": "Prism Room", "kicker": "Where white light splits", "type": "explainer",
+  "tags": ["physics", "optics", "light"], "created": "2026-10-08", "source": "topics/prism-room.md", "sourceSha256": "…" }
+```
+
+**Done when:** check scripts pass and the pendulum still verifies clean (it exercises none of the new features, so this is a regression check).
+
+### 3.1 `prism-room/` — Explainer
+
+**Topic:** `topics/prism-room.md`, freeform prose written like a real user input.
+
+**Model (`prism-room/model.js`, pure):**
+- Refractive index from Schott **N-SF11** Sellmeier (B = 1.73759695, 0.313747346, 1.89878101; C = 0.013188707, 0.0623068142, 155.23629 µm²).
+- 2D ray tracer in the bench plane (x, z). Prisms are triangles (apex A = 60°) with position and rotation. Each ray intersects faces, refracts with vector Snell, and reflects on total internal reflection (TIR), up to 8 bounces. Output per wavelength band is a polyline. The page draws these paths directly, so what you see is what the model computed.
+- 7 bands from 400–700 nm plus a white "reference" ray at 589.3 nm (sodium D line).
+- Outputs: `incidence` (at the first face), `deviation` (589 nm), `spread` (400 vs 700 nm exit angle), `tir` (bool per band), `paths[]`, `screenHits[]` (where each band lands on the screen card), `curve` (deviation vs incidence 30–90° for the screen chart), `minDev` / `minDevIncidence`.
+
+**Asserts (`model.test.mjs`), checked against values I computed today:**
+- n(589.3) = 1.7845 ± 1e-4; n(400) = 1.8454; n(700) = 1.7718
+- incidence 72° → deviation 68.31°, spread 8.40° (matches the sael.net reference numbers)
+- minimum deviation 66.31° at incidence 63.15°, i.e. A + δ_min = 2·asin(n·sin(A/2))
+- violet hits TIR at the exit face below about 57.5° incidence
+- **Rejoin mode:** a second identical prism, inverted, makes all exit rays parallel within 0.1°
+- traced deviation equals the closed-form formula within 0.01° (the tracer cross-checks the formula)
+
+**State:** `{ light: 0, prism: 0, second: false }`. `light` = source swing (−20…20°); `prism` = stage rotation (−30…30°). Incidence comes out of the geometry; it is not a slider. Base pose puts incidence at 72°.
+
+**Stats:** Incidence °, Deviation °, Spread °.
+
+**Narration:** live numbers, color-coded (cyan = light, amber = deviation, violet/red band names). Says "trapped" when any band hits TIR.
+
+**Controls:**
+- Prism slider (`[ ]`)
+- Light slider (`; '`)
+- Second prism toggle Waiting/In (`P`)
+- View V: Lab / Exploded / Studio
+
+**Modes:**
+1. **Split**: base pose
+2. **Least bend**: prism turned to the minimum-deviation incidence. The screen chart marks the minimum
+3. **Trapped**: turned until violet, then all bands, hit TIR. Beams bounce inside the glass
+4. **Rejoin**: second prism In, recombines to white
+
+**Scene (build):**
+- Room (warm wall, window with sun shafts), bench, and a black optical rail with 3 carriers:
+  1. Light source box with slit, an emissive lens and a knob that mirrors the Light slider
+  2. Rotation stage with an engraved degree ring and a knob that mirrors the Prism slider. The prism sits on it (glass: transmission + `dispersion` on high/med, `onTier` swaps to plain transparent glass on low)
+  3. White screen card where the fan lands
+- Second prism on a side carrier. It slides into the beam when toggled (tweened through state, so mode switches animate it).
+- Beams: white ribbon in, 7 colored ribbons inside the glass and out. Low bloom threshold on beams only (emissive > 1).
+- Props: plant, shelf, lamp, cable from the source box to the bench edge.
+
+**Screens:**
+- Console monitor: deviation-vs-incidence curve, current point, dashed line at the minimum, TIR region shaded.
+- Screen card: a spectrum strip drawn at the band hit positions, plus the width in mm. This is the diegetic "screen" from the PRD anatomy.
+
+**Labels:**
+- "Light 72°" at the entry point
+- "Deviation 68.3°" at the exit
+- "Spread 8.4°" on the screen card
+- "Trapped" pill at the TIR face (only when TIR occurs)
+
+**Views:**
+- Lab: 3/4 view from the front
+- Exploded: near top-down, showing the ray geometry like a diagram
+- Studio: low and close on the prism, beams in the foreground
+
+**Done when:**
+- asserts pass
+- clean console
+- 4 modes × 3 views look right at desktop and phone width
+- fps ≥ 55 desktop
+- `thumb.jpg` and `meta.json` written
+- **owner review**
+
+### 3.2 `river-delta/` — World (topic still open, see below)
+
+**Topic:** `topics/river-delta.md`: how sea level and river flow reshape a delta.
+
+**Model (`river-delta/model.js`, pure):**
+- Deterministic heightfield, 129×129. Seeded value-noise fBm (inside model.js so Node can run it; no three import), plus a carved main channel, 3 distributaries fanning to the coast, natural levees along the banks, and a low wetland basin behind a levee.
+- **Flooding:** cells below sea level that connect to the open sea are flooded (4-neighbour flood fill from the sea edge). It is not a plain bathtub fill, so the leveed basin stays dry until the water overtops the levee. That gives a nonlinear jump worth showing.
+- **River:** hydraulic geometry (Leopold & Maddock, at-a-station form): width = a·Q^0.5, depth = c·Q^0.4, with documented coefficients. Discharge Q slider from 500 to 20,000 m³/s. Bank overflow floods cells near the channel lower than the river stage.
+- Outputs: `floodedPct`, `riverWidth` (m), `stage` (m), `basinFlooded` (bool), `mask` (Uint8Array grid for the water texture), `shorelineKm`.
+
+**Asserts:**
+- flooded % never decreases as sea level rises (monotonic)
+- 0% at the lowest sea level
+- the basin stays dry until sea level passes the levee crest, then floods
+- width and depth scale exponents check out: doubling Q multiplies width by √2
+- heightfield is deterministic for a given seed
+
+**State:** `{ sea: 0, flow: 3000, time: 'day' }`.
+- Sea level slider (−1…+4 m, `[ ]`)
+- Flow slider (`; '`)
+- Time-of-day toggle Day / Dusk / Night (`T`)
+
+**Stats:** Land flooded %, River width m, Water level m.
+
+**Modes:**
+1. Today
+2. +1 m sea
+3. Flood season
+4. Levee breach: sea rises past the crest and the basin fills
+
+**Scene:**
+- Tilted diorama on a plinth (PRD scene grammar for Worlds), with a cut-away soil edge showing strata.
+- Terrain from `kit.terrainFromHeights` with a custom color ramp (sand, marsh, fields).
+- Water plane masked by an alpha texture taken from the flood-fill `mask`, so it shows exactly the model's flooded cells.
+- Instanced low-poly town blocks on the high ground, and a few farm patches.
+- Time of day lerps the sun direction and color, the sky/fog color, and turns on emissive window lights at night.
+
+**Hotspots (info labels):** Town, Levee, Wetland, River mouth. Each opens a short paragraph with live numbers.
+
+**Screen:** none required for World (PRD §7.3). Optional: a small cross-section panel on the plinth face showing the river stage against the levee.
+
+**Views:**
+- Overview: 3/4 above the plinth
+- River mouth: close, low
+- Eye level: from the town
+
+**Done when:** same checklist as the prism page, then **owner review**.
+
+### 3.3 Capture what worked
+
+After both reviews:
+- Write `.claude/skills/explain/STYLE.md` and `PATTERNS.md` drafts: optics bench recipe, terrain diorama recipe, lighting values, beam and glass settings, label density rules.
+- Any runtime gaps found while building the two pages go back into `lib/` (not page code), and the check scripts are re-run.
+
+### 3.4 Order and checkpoints
+1. 3.0 runtime additions → commit
+2. prism-room: model + asserts → page → verify → commit → **owner review / tweaks**
+3. river-delta: same loop → **owner review / tweaks**
+4. 3.3 drafts → commit
+
+### 3.5 Owner inputs
+- **World topic.** River delta is still my proposal. Alternatives with the same machinery: a city block flood, or a campus solar/shadow study. Say before step 3 starts.
+- **Look reference.** If any sael.net page is the specific bar for the World (e.g. one of its "Worlds"), name it.
 
 ---
 
