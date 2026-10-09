@@ -1,0 +1,13 @@
+{
+  "slug": "moon-phases",
+  "title": "Moon Phases",
+  "kicker": "Why the Moon changes shape",
+  "type": "explainer",
+  "tags": [
+    "astronomy",
+    "light"
+  ],
+  "created": "2026-10-09",
+  "source": "topics/moon-phases.md",
+  "sourceSha256": "f0ffe613113294f508521920362f9fe590ccfd9df668f10f931b2345cd7e257b"
+}

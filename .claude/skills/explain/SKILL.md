@@ -67,18 +67,18 @@ Fetch once at build time, reduce, write `<slug>/data.json`, record source and da
 - Write the topic's source link by setting `slug` in the config (footer links `../topics/<slug>.md`).
 
 ### 7. Verify (mandatory, see `VERIFY.md`)
-Run `tools/test.sh`, then the verify loop in `.claude/skills/explain/VERIFY.md` (Chrome extension, or `tools/verify.mjs` when it is not connected). **Max 3 fix iterations**, then report
-what remains. A page that was not opened in Chrome is not finished.
+Run `tools/test.sh`, then the verify loop in `.claude/skills/explain/VERIFY.md` (Chrome extension, or `tools/verify.mjs` when it is not connected). **Use the 3 fix iterations while problems remain**: do not stop at 2 with a known layout problem (clipped hero on a phone, a label
+over the title, a hidden label). After the third, report exactly what remains. A page that was never rendered in a browser is not finished.
 
 ### 8. Capture
 - Thumbnail: `node tools/verify.mjs <slug> --thumb` (mode 1, default view), or `__bt.saveThumb()` from the best mode and view in the extension.
 - `node tools/meta.mjs <slug> "<Title>" "<Kicker>" <type> <tag,tag>` writes `meta.json` (hashes the topic).
 
 ### 9. Report (short)
-Path and local URL, the plan as built, **model assumptions and simplifications**, test results, screenshots reviewed (modes
-by views, desktop and phone), anything unresolved, and anything you changed in `lib/`. Do not commit or push unless asked.
+Path and local URL, the plan as built (including anything from the topic you did not build, and why), **model assumptions and simplifications**, test results, screenshots reviewed (modes
+by views, desktop and phone), anything unresolved, anything you changed in `lib/`, and **the outcome of step 10** (what you appended to `PATTERNS.md`, or "nothing new" with one reason). Do not commit or push unless asked.
 
-### 10. Learn
+### 10. Learn (required, even if the answer is "nothing new")
 If the page introduced a scene recipe that worked, append it to `PATTERNS.md` (recipe, numbers, pitfalls). If you hit a
 trap, add it to the pitfalls list. Keep entries short and concrete.
 

@@ -14,6 +14,7 @@ recipes get appended at the bottom by step 10 of the procedure.
 8. Domain mapping hints (software, GIS, business)
 9. Pitfalls (read before the verify loop)
 10. Paraxial eye/lens bench: `spectacles/`
+11. A body lit from a fixed direction (custom shader): `moon-phases/`
 
 ## 1. Model-first page
 `model.js` (pure) -> `model.test.mjs` (asserts) -> page. The page never computes a displayed number itself.
@@ -78,6 +79,18 @@ user opened it.
   (`globalAlpha = 1/(i+1)`). Defocus blur really is a disc, and `ctx.filter` is not available in Safari.
 - Camera: choose the Rays view so the focus and retina clear the control panel (shift the target), and a Retina view that looks at the
   monitor from the side the eye is NOT on, otherwise the eye's labels land on the title block. Use `phoneFit` for portrait.
+
+## 11. A body lit only from a fixed direction (`moon-phases/`)
+Built by a cold session from `topics/moon-phases.md`; it is the reference for "one slider drives a pose, a derived quantity is the star".
+- Model: one angle (`elong` from the lamp direction) and `lit = (1 - cos(elong)) / 2`; phase names by elongation cut points; waxing vs waning
+  from `elong < 180`. Tests: principal phases (0, 50, 100, 50 %), a geometric cross-check of the lit fraction, mirror symmetry waxing/waning,
+  monotonic rise to full, day wrapping, finite sweep.
+- Lighting a ball so only the lamp lights it (room lights must not wash the dark half): a small `ShaderMaterial` with a `sunDir` uniform and
+  `smoothstep(-.03, .12, dot(normalize(worldNormal), sunDir))` between a 2.5 % ambient and full albedo; procedural albedo from object-space noise.
+- Sky screen: draw the disc from the same model result: dark disc, then the lit region as half-ellipse arcs by phase; name and percent in text.
+- A head-sized Earth whose nose turns toward the Moon makes the "view from Earth" screen meaningful.
+- Orbit-scale scenes are small on a phone: `phoneFit` about 2 on the overview and 1.35 on a top view. Keep sunbeams as short stubs by the lamp; full-length
+  beams read as bars.
 
 ## 9. Pitfalls (each cost real time once)
 - Helpers that `build`, `update` or a screen `draw` call are executed **during** `createExplainer(...)`. Declare them as `function` declarations (hoisted),

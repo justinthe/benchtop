@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Moon Phases — benchtop</title>
+<meta name="description" content="Why the Moon has phases: move the Moon round its orbit and see how much of its always-lit half faces Earth.">
+<meta property="og:title" content="Moon Phases"><meta property="og:description" content="Half the Moon is always lit; the phase is how much of that half we can see from Earth."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { model, SYNODIC } from './model.js';
+
+const C = [.4, 1.4, 0], R = 1.15, SUN_X = -2.35, MOON_R = .16, EARTH_R = .22;   // Earth centre, orbit radius, lamp x, sizes (scene units, not to scale)
+const f = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
+
+createExplainer({
+  slug: 'moon-phases', kicker: 'Why the Moon changes shape', title: 'Moon Phases',
+  hook: 'The Moon never changes shape, and half of it is always lit. So why do we sometimes see only a sliver?',
+  type: 'explainer', fov: 38, bloom: .3, bloomThreshold: 1.0, environmentIntensity: .3,
+
+  // ---------- Config ----------
+  state: { day: SYNODIC / 4 },
+  model,
+  stats: [
+    { key: 'litPct', label: 'Lit as seen', unit: ' %', fmt: 0 },
+    { key: 'day', label: 'Day of month', unit: ' d', fmt: 1 },
+    { key: 'elong', label: 'Round orbit', unit: '°', fmt: 0 },
+  ],
+  narrate: (s, m) => {
+    let t = `On day <b class="c-a">${f(m.day)}</b> the Moon is <b class="c-a">${m.elong.toFixed(0)}°</b> round its orbit from the Sun. `;
+    if (m.litPct < 1) t += 'Its lit half faces away from us, so from Earth we see only the dark side: <b class="c-b">new moon</b>.';
+    else if (m.litPct > 99) t += 'We look straight at its lit half: <b class="c-b">full moon</b>, all of the disc bright.';
+    else t += `We see <b class="c-b">${m.litPct.toFixed(0)}%</b> of the disc lit, on the ${m.waxing ? 'right' : 'left'} (northern sky), and it is ${m.waxing ? 'growing' : 'shrinking'}: <b class="c-b">${m.name.toLowerCase()}</b>.`;
+    return t + ` The next full moon is <b class="c-c">${f(m.toFull)} days</b> away.`;
+  },
+  controls: [
+    { type: 'slider', key: 'day', label: 'Day of month', min: 0, max: SYNODIC, step: .1, unit: ' d', fmt: 1, keys: ['[', ']'] },
+  ],
+  modes: [
+    { name: 'New moon', state: { day: 0 }, camera: 'top', caption: 'Lit half faces away from us' },
+    { name: 'First quarter', state: { day: 7.4 }, camera: 'top', caption: 'A right angle: half the lit half' },
+    { name: 'Full moon', state: { day: 14.8 }, camera: 'bench', caption: 'We face the whole lit half' },
+    { name: 'Last quarter', state: { day: 22.1 }, camera: 'sky', caption: 'Lit on the left, shrinking' },
+  ],
+  views: {
+    bench: { label: 'Bench', pos: [.6, 3.2, 4.7], target: [.4, 1.2, .2], phoneFit: 2.0 },
+    top: { label: 'Top', pos: [-.1, 6.4, 1.6], target: [-.1, 1.2, 0], phoneFit: 1.35 },
+    sky: { label: 'Sky', pos: [1.3, 1.9, 3.5], target: [2.3, 1.4, 1.0], phoneFit: 1.15 },
+  },
+  labels: [
+    { anchor: r => r.moonAnchor, text: (s, m) => `${m.name} ${m.litPct.toFixed(0)}%`, priority: 4,
+      info: () => 'Half of the Moon is lit by the Sun at every moment, just like half of Earth is in daylight. The phase is how much of that lit half happens to face us. At new moon we look at its night side; at full moon, its day side; at the quarters we see the lit half edge-on, so half the disc looks bright.' },
+    { anchor: r => r.sunAnchor, text: () => 'Sunlight', priority: 2 },
+    { anchor: r => r.headAnchor, text: () => 'You on Earth', priority: 3 },
+  ],
+  screens: [{ mesh: r => r.screen, size: [640, 400], draw: drawSky }],
+  sound: { ambient: 'room', ui: true },
+  assumptions: `The classroom picture: the Sun is a lamp so far away that its rays are parallel (always shining from the left), the Moon travels once round Earth in a synodic month of ${SYNODIC} days on a flat circular orbit, and day 0 is new moon. The lit fraction of the disc is (1 − cos of the angle round the orbit) / 2. Sizes and distances are not to scale (the real Moon is about 30 Earth widths from Earth, and much smaller than shown). The orbit is drawn flat: the real orbit is tilted about 5°, which is why eclipses do not happen every month and are not shown. Phase names switch about 1.5 days either side of new, quarter and full. The sky screen shows the view from the northern hemisphere, where the waxing Moon is lit on the right; from the southern hemisphere it appears upside down. The real month also varies by several hours, and the Moon's orbit is slightly elliptical; neither is modelled.`,
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit;
+    const room = kit.room({ w: 11, d: 8, wall: 0x7d6e60 }); room.position.z = -.3; scene.add(room);
+    scene.add(kit.bench({ w: 6.2, d: 3.6, h: .8 }));
+    const plate = kit.roundedBox(5.9, .02, 3.3, .008, mat.matte(0x1c1a19, .55)); plate.position.y = .81; scene.add(plate);
+    const win = kit.windowLight({ from: [3, 3.6, -7], intensity: 1.3, w: 1.8, h: 1.9 }); win.group.position.set(2.8, 2.1, -4.27); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 7, 10, 2); lamp.position.set(-3.2, 2.6, 1.8); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .2));
+    const shelf = kit.shelf({ w: 1.8, h: 1.5 }); shelf.position.set(-3.5, 0, -4.0); scene.add(shelf);
+    const plant = kit.plant({ h: 1.0, leaves: 11 }); plant.position.set(-4.5, 0, -3.0); scene.add(plant);
+
+    // Sun: a bulb on a post, far left of the orbit
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(.3, 32, 20), mat.emissive(0xffd9a0, 2.6)); sun.position.set(SUN_X, C[1], 0); sun.castShadow = false; scene.add(sun);
+    const sunPost = kit.roundedBox(.1, C[1] - .8 - .3, .1, .02, mat.metal(0x3a3d41, .4)); sunPost.position.set(SUN_X, (C[1] - .3 + .8) / 2, 0); scene.add(sunPost);
+    const sunAnchor = kit.anchor(0, .55, 0); sun.add(sunAnchor);
+    const rays = [-.7, 0, .7].map(z => { const b = kit.beam(0xffd9a0, .006, { boost: 1.3 }); b.setPath([[SUN_X + .32, C[1], z], [SUN_X + 1.1, C[1], z]]); b.setOpacity(.5); b.renderOrder = 10; scene.add(b); return b; });
+
+    // Earth: a head on a post, nose turns to follow the Moon
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(.045, .07, C[1] - .8 - EARTH_R, 16), mat.metal(0x6f757c, .45)); post.position.set(C[0], (C[1] - EARTH_R + .8) / 2, C[2]); post.castShadow = true; scene.add(post);
+    const head = new THREE.Group(); head.position.set(C[0], C[1], C[2]); scene.add(head);
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 36, 24), mat.matte(0x3f7fb5, .6)));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(.04, .09, 16), mat.matte(0xe8e4dc, .5)); nose.rotation.z = -Math.PI / 2; nose.position.x = EARTH_R + .035; head.add(nose);
+    for (const z of [-.085, .085]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(.03, 14, 10), mat.matte(0xf4f1ea, .3)); eye.position.set(EARTH_R - .035, .06, z); head.add(eye); }
+    const headAnchor = kit.anchor(0, EARTH_R + .3, 0); head.add(headAnchor);
+
+    // orbit ring and arm
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(R, .006, 6, 120), mat.matte(0xb8bcc2, .6)); ring.rotation.x = Math.PI / 2; ring.position.set(...C); ring.castShadow = false; scene.add(ring);
+    const arm = new THREE.Group(); arm.position.set(...C); scene.add(arm);
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, R - MOON_R - EARTH_R, 8), mat.metal(0x3a3d41, .4)); rod.rotation.z = Math.PI / 2; rod.position.x = (EARTH_R + R - MOON_R) / 2; arm.add(rod);
+
+    // Moon: lit by the lamp direction only (custom shader), so the dark half stays dark whatever the room lights do
+    const moonMat = new THREE.ShaderMaterial({
+      uniforms: { sunDir: { value: new THREE.Vector3(-1, 0, 0) } },
+      vertexShader: 'varying vec3 vW; varying vec3 vO; void main(){ vO = normal; vW = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+      fragmentShader: 'uniform vec3 sunDir; varying vec3 vW; varying vec3 vO; void main(){ float m = .5 + .5 * sin(vO.x * 5. + 1.) * sin(vO.y * 4. + 2.) * sin(vO.z * 6.); vec3 alb = mix(vec3(.5), vec3(.88, .86, .82), m); float l = smoothstep(-.03, .12, dot(normalize(vW), sunDir)); gl_FragColor = vec4(alb * mix(.025, 1.15, l), 1.); }',
+    });
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(MOON_R, 40, 28), moonMat); moon.castShadow = false; moon.receiveShadow = false; scene.add(moon);
+    const moonAnchor = kit.anchor(0, -MOON_R - .2, 0); moon.add(moonAnchor);
+
+    // sky monitor (front-right): the view from Earth
+    const { group: mon, screen } = kit.screenBezel(1.1, .69, { depth: .05 }); mon.position.set(2.45, 1.3, 1.0); mon.rotation.y = -.55; scene.add(mon);
+    const stand = kit.roundedBox(.08, .45, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(2.45, 1.0, .95); stand.rotation.y = -.55; scene.add(stand);
+    const foot = kit.roundedBox(.55, .03, .36, .01, mat.metal(0x6f757c, .4)); foot.position.set(2.45, .815, .98); foot.rotation.y = -.55; scene.add(foot);
+
+    return { head, arm, moon, moonAnchor, sunAnchor, headAnchor, screen, rays, lastM: null };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m) {
+    if (r.lastM === m) return; r.lastM = m;
+    const a = m.thetaRad + Math.PI;                       // local +x of head and arm points at the Moon (rotation.y = angle + 180 deg)
+    r.arm.rotation.y = a; r.head.rotation.y = a;
+    r.moon.position.set(C[0] + R * m.moon[0], C[1], C[2] + R * m.moon[1]);
+    r.moon.rotation.y = a;                                // near side keeps facing Earth
+  },
+});
+
+// ---------- Screen: the Moon as seen from Earth (northern hemisphere) ----------
+var stars; // var: used by drawSky during createExplainer
+function drawSky(ctx, s, m, r, w, h) {
+  if (!stars) { stars = []; let q = 7; for (let i = 0; i < 70; i++) { q = (q * 16807) % 2147483647; const x = q % w; q = (q * 16807) % 2147483647; stars.push([x, 40 + q % (h - 40), 1 + (q % 3) / 2]); } }
+  ctx.fillStyle = '#080b12'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(220,230,255,.55)'; for (const [x, y, z] of stars) ctx.fillRect(x, y, z, z);
+  const cx = w / 2, cy = 215, rad = 130, k = Math.cos(m.thetaRad), sg = m.waxing ? 1 : -1;
+  ctx.fillStyle = '#1b2029'; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();   // dark side, faint earthshine
+  ctx.fillStyle = '#ece6d6';
+  for (let y = -rad; y <= rad; y += 1) {                  // lit region per scanline: between the limb and the terminator
+    const hw = Math.sqrt(rad * rad - y * y), xt = k * hw;
+    const x0 = sg > 0 ? xt : -hw, x1 = sg > 0 ? hw : -xt;
+    if (x1 > x0) ctx.fillRect(cx + x0, cy + y, x1 - x0, 1.5);
+  }
+  ctx.strokeStyle = 'rgba(207,227,240,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = 'rgba(13,17,20,.82)'; ctx.fillRect(0, 0, w, 34);
+  ctx.font = '600 20px "JetBrains Mono", monospace'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'; ctx.fillStyle = '#cfe3f0'; ctx.fillText('VIEW FROM EARTH', 14, 24);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#ffb454'; ctx.fillText(`${m.litPct.toFixed(0)}% LIT`, w - 14, 24);
+  ctx.textAlign = 'center'; ctx.font = '600 22px "JetBrains Mono", monospace'; ctx.fillStyle = '#cfe3f0'; ctx.fillText(m.name.toUpperCase(), cx, h - 18);
+}
+</script>
+</body>
+</html>
