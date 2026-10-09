@@ -1,1 +1,13 @@
-{ "slug": "pendulum", "title": "Pendulum Lab", "kicker": "Why swings keep time", "type": "explainer", "tags": ["physics", "mechanics"], "created": "2026-10-08", "source": "topics/pendulum.md" }
+{
+  "slug": "pendulum",
+  "title": "Pendulum Lab",
+  "kicker": "Why swings keep time",
+  "type": "explainer",
+  "tags": [
+    "physics",
+    "mechanics"
+  ],
+  "created": "2026-10-08",
+  "source": "topics/pendulum.md",
+  "sourceSha256": "b4fd6d7a1eb114670e056ac94fc6a743dfc5111109345c66f99334a02da72193"
+}

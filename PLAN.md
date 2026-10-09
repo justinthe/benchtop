@@ -293,6 +293,8 @@ After both reviews:
 
 ## 4. M3 — Skill v1 (`.claude/skills/explain/`)
 
+**Status (2026-10-09):** skill files written (`SKILL.md`, `API.md`, `STYLE.md`, `PATTERNS.md`, `VERIFY.md`, `examples.md`, runnable `template.html` + model shape files); helper tools `tools/meta.mjs` and `tools/test.sh` added. **Not yet done:** browser check of the template page (Chrome extension was disconnected) and the acceptance run `/explain topics/spectacles.md` (written; not run).
+
 ```
 SKILL.md        # frontmatter (name: explain, description triggers on "/explain <file.md>") + procedure PRD §9.2
 STYLE.md        # PRD §7.3 expanded with concrete tokens, scene grammar per type, writing voice (kicker ≤5 words, hook 2–3 sentences, narration ≤60 words with live numbers)

@@ -2,3 +2,4 @@
 scratch/
 *.tmp
 node_modules/
+*.swp
