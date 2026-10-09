@@ -1,0 +1,15 @@
+{
+  "slug": "spectacles",
+  "title": "Spectacle Bench",
+  "kicker": "Why glasses sharpen things",
+  "type": "explainer",
+  "tags": [
+    "optics",
+    "physics",
+    "eye",
+    "vision"
+  ],
+  "created": "2026-10-09",
+  "source": "topics/spectacles.md",
+  "sourceSha256": "48dfc40d635a7feadf3e0c18bb35a15773bd0760fd6d220fc96c60aa6e289c72"
+}

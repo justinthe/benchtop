@@ -7,6 +7,7 @@
 <title>Cube Lab — benchtop</title>
 <meta name="description" content="REPLACE: one sentence on what the reader will understand.">
 <meta property="og:title" content="Cube Lab"><meta property="og:description" content="REPLACE: same sentence."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="../lib/explainer.css">
 <script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
 </head>
@@ -15,6 +16,7 @@
 import { createExplainer } from '../lib/explainer.js';
 import { model } from './model.js';
 
+const SCALE = .6;
 const f = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—');
 
 createExplainer({
@@ -39,7 +41,7 @@ createExplainer({
     { name: 'Double it', state: { side: 1.6, spin: .4 }, camera: 'close', caption: 'Bigger side, much bigger volume' },
   ],
   views: {
-    lab: { label: 'Lab', pos: [1.6, 2.2, 3.4], target: [0, 1.1, 0] },
+    lab: { label: 'Lab', pos: [1.6, 2.2, 3.4], target: [0, 1.05, 0] },
     close: { label: 'Close', pos: [.6, 1.7, 2.4], target: [0, 1.1, 0] },
     studio: { label: 'Studio', pos: [2.8, 3.0, 2.6], target: [0, 1.0, 0] },
   },
@@ -63,15 +65,16 @@ createExplainer({
 
     const cube = kit.roundedBox(1, 1, 1, .03, mat.plastic(0xc9a45c, .35)); scene.add(cube);   // hero (scaled in update)
     const cubeAnchor = kit.anchor(); cube.add(cubeAnchor);
-    const { group, screen } = kit.screenBezel(1.1, .65); group.position.set(1.25, 1.35, -.15); group.rotation.y = -.4; scene.add(group);
-    const stand = kit.roundedBox(.08, .45, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(1.25, 1.02, -.2); scene.add(stand);
+    const { group, screen } = kit.screenBezel(1.1, .65); group.position.set(.95, 1.4, -.55); group.rotation.y = -.3; scene.add(group);
+    const stand = kit.roundedBox(.08, .45, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(.95, 1.07, -.6); scene.add(stand);
     return { cube, cubeAnchor, screen, kit };
   },
 
   // ---------- Update (animate the scene from state and model; no per-frame allocation) ----------
   update(r, s, m, dt) {
-    r.cube.scale.setScalar(s.side); r.cube.position.y = .8 + s.side / 2; r.cube.rotation.y += s.spin * dt;
-    r.cubeAnchor.position.set(0, .5 + .25 / s.side, 0);   // local to the scaled cube: always .25 m above its top
+    const k = s.side * SCALE;   // scene drawing scale: 1 m of model = SCALE units of scene (keeps the hero a sensible size)
+    r.cube.scale.setScalar(k); r.cube.position.y = .8 + k / 2; r.cube.rotation.y += s.spin * dt;
+    r.cubeAnchor.position.set(0, .5 + .25 / k, 0);   // local to the scaled cube: always .25 units above its top
   },
 });
 

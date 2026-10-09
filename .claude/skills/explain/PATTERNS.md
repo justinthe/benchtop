@@ -13,6 +13,7 @@ recipes get appended at the bottom by step 10 of the procedure.
 7. Info hotspots
 8. Domain mapping hints (software, GIS, business)
 9. Pitfalls (read before the verify loop)
+10. Paraxial eye/lens bench: `spectacles/`
 
 ## 1. Model-first page
 `model.js` (pure) -> `model.test.mjs` (asserts) -> page. The page never computes a displayed number itself.
@@ -65,7 +66,25 @@ user opened it.
   an energy-level diagram on a wall display so the same number appears on a thermometer, a trace and a diagram.
 - **Biology**: macro diorama (a cell as a room); particles for molecules; a slider for concentration or time.
 
+## 10. Paraxial eye/lens bench (`spectacles/`)
+- Model: reduced eye (60 D surface, fluid n = 1.336, retina at the axial length) plus a thin lens in the same plane. `model()` returns the
+  focus, blur, needed power **and the ray polylines** (7 marginal rays inside a 4 mm pupil, plus a dim "past the retina" segment when the
+  focus falls behind it), so the 3D rays are the computed ones. Tests: exact ray-crosses-axis-at-focus and retina-height identities,
+  `needed power = 1336/L - 60` against the topic's numbers, finite sweep, and the corrected modes land within the sharp threshold.
+- Scale: pick one `S` (units per mm) so the whole eye reads (S = 0.07 makes a 22 mm eye about 1.5 units); raise the eye on a post.
+- The eye is one transparent ellipsoid whose x-scale follows the axial length; the retina disc and rays follow the same value.
+- The thin lens is a `LatheGeometry` rebuilt only when the power moves more than 0.04 D (dispose the old geometry).
+- Retina picture: draw the sharp chart once to a cached canvas, then average N = 48 disc-shaped offsets with running-mean alpha
+  (`globalAlpha = 1/(i+1)`). Defocus blur really is a disc, and `ctx.filter` is not available in Safari.
+- Camera: choose the Rays view so the focus and retina clear the control panel (shift the target), and a Retina view that looks at the
+  monitor from the side the eye is NOT on, otherwise the eye's labels land on the title block. Use `phoneFit` for portrait.
+
 ## 9. Pitfalls (each cost real time once)
+- Helpers that `build`, `update` or a screen `draw` call are executed **during** `createExplainer(...)`. Declare them as `function` declarations (hoisted),
+  `var`, or above the call. A `const`/`let` below the call is a temporal-dead-zone `ReferenceError` and the page stays blank.
+- `THREE.Clock` is deprecated in r186 (the runtime no longer uses it). Do not use it in pages; use `dt` from `update`.
+- A page that 404s on the favicon logs a console error: keep the inline `<link rel="icon" ...>` from the template.
+- The scripted verifier (`tools/verify.mjs`) clicks info labels through the DOM because a culled label can be off-screen.
 - `THREE.PCFSoftShadowMap` was removed in r186. The runtime uses `PCFShadowMap`; do not set shadow types yourself.
 - `kit.beam.setPath([])` must be safe (it is); never index pooled meshes with a negative index.
 - Positions of children are **local**: an emissive tick at `y = .921` inside a group at `y = .89` floats at 1.81. Check with `__bt.scene.traverse` + `getWorldPosition`.

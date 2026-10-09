@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spectacle Bench — benchtop</title>
+<meta name="description" content="How spectacles work: change the eye length and the lens power and watch light focus on, in front of, or behind the retina.">
+<meta property="og:title" content="Spectacle Bench"><meta property="og:description" content="How spectacles bend light so the picture lands sharply on the retina."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { model, neededPower, NORMAL_LENGTH, PUPIL, SHARP_UM } from './model.js';
+
+const S = .07, EX = -.7, EYE_Y = 1.75, RAD_MM = 12;            // scene units per mm, cornea x, eye height, eye radius (mm)
+const sg = (v, d = 1) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const f1 = v => (Number.isFinite(v) ? v.toFixed(1) : '—');
+
+createExplainer({
+  slug: 'spectacles', kicker: 'Why glasses sharpen things', title: 'Spectacle Bench',
+  hook: 'Light must focus exactly on the retina to look sharp. Glasses bend it first, so any eye can land it there.',
+  type: 'explainer', fov: 38, bloom: .3, bloomThreshold: 1.0, environmentIntensity: .4,
+
+  // ---------- Config ----------
+  state: { eye: NORMAL_LENGTH, lens: 0 },
+  model,
+  stats: [
+    { key: 'focus', label: 'Focus', unit: ' mm', fmt: 1 },
+    { key: 'blurUm', label: 'Blur', unit: ' µm', fmt: 0 },
+    { key: 'needed', label: 'Lens needed', unit: ' D', fmt: 1 },
+  ],
+  narrate: (s, m) => {
+    const where = Math.abs(m.offset) < .05 ? 'right on the retina' : m.offset < 0 ? `<b class="c-c">${Math.abs(m.offset).toFixed(1)} mm in front of</b> the retina` : `<b class="c-c">${m.offset.toFixed(1)} mm behind</b> the retina`;
+    let t = `Light from a far object comes to a point <b class="c-a">${m.focus.toFixed(1)} mm</b> inside this ${s.eye.toFixed(1)} mm eye${s.lens ? ` with a ${sg(s.lens, 2)} D lens` : ''}: ${where}. `;
+    t += m.sharp ? `The picture is sharp (a blur circle of just ${m.blurUm.toFixed(0)} µm).`
+      : `By the time it reaches the retina it has spread into a blur circle <b class="c-b">${m.blurUm.toFixed(0)} µm</b> wide.`;
+    if (!m.corrected) t += m.needed < 0 ? ` This long eye is short-sighted and needs a concave lens of about <b class="c-b">${sg(m.needed)} D</b>.` : ` This short eye is long-sighted and needs a convex lens of about <b class="c-b">${sg(m.needed)} D</b>.`;
+    else if (s.lens) t += ' The lens bends the light just enough to cancel the eye\'s length error.';
+    return t;
+  },
+  controls: [
+    { type: 'slider', key: 'eye', label: 'Eye length', min: 20, max: 27, step: .1, unit: ' mm', fmt: 1, keys: ['[', ']'] },
+    { type: 'slider', key: 'lens', label: 'Lens', min: -8, max: 6, step: .25, unit: ' D', fmt: 2, keys: [';', "'"] },
+  ],
+  modes: [
+    { name: 'Normal eye', state: { eye: NORMAL_LENGTH, lens: 0 }, camera: 'bench', caption: 'Focus lands on the retina' },
+    { name: 'Short-sighted', state: { eye: 24.5, lens: 0 }, camera: 'rays', caption: 'Too long: focus falls short' },
+    { name: 'Concave fix', state: { eye: 24.5, lens: -5.5 }, camera: 'rays', caption: 'A diverging lens pushes focus back' },
+    { name: 'Long-sighted fix', state: { eye: 21.0, lens: 3.5 }, camera: 'chart', caption: 'A converging lens pulls focus forward' },
+  ],
+  views: {
+    bench: { label: 'Bench', pos: [1.2, 3.1, 5.2], target: [-.2, 1.55, 0], phoneFit: 1.3 },
+    rays: { label: 'Rays', pos: [.3, 1.8, 4.6], target: [.3, 1.7, 0], phoneFit: 1.1 },
+    chart: { label: 'Retina', pos: [1.3, 1.6, 3.3], target: [2.45, 1.35, 1.0], phoneFit: 1.15 },
+  },
+  labels: [
+    { anchor: r => r.focusAnchor, text: (s, m) => `Focus ${m.focus.toFixed(1)} mm`, priority: 4,
+      info: (s, m) => `The eye bends light with about 60 D of power, so distant light focuses ${NORMAL_LENGTH.toFixed(1)} mm behind the front of a normal eye. In a longer eye the focus falls in front of the retina (short-sighted); in a shorter eye it would fall behind it (long-sighted). About 2.7 D of correction per millimetre of error.` },
+    { anchor: r => r.retinaAnchor, text: (s, m) => (m.sharp ? 'Retina: sharp' : `Retina: blur ${m.blurUm.toFixed(0)} µm`), priority: 3 },
+    { anchor: r => r.lensAnchor, text: s => `Lens ${sg(s.lens, 2)} D`, show: s => Math.abs(s.lens) >= .125, priority: 2 },
+  ],
+  screens: [{ mesh: r => r.screen, size: [640, 400], draw: drawRetina }],
+  sound: { ambient: 'room', ui: true },
+  assumptions: `A reduced eye: one refracting surface of 60 D with the eye filled with fluid of index 1.336, so distant light focuses 1336/60 = 22.3 mm behind it. Eye length changes the retina position only. The spectacle lens is thin and sits in the same plane as the eye's surface (the small gap between glasses and eye is ignored, so vertex distance is not modelled). Rays are paraxial. Pupil 4 mm. The blur circle on the retina is pupil x |focus − length| / focus; a picture counts as sharp under about ${SHARP_UM} µm. The retina picture is drawn by averaging copies of the letter chart over that blur disc. Not modelled: astigmatism, accommodation, ageing, lens thickness, surface reflections.`,
+  onTier(r, tier) { r.lensMesh.material = tier === 'low' ? r.glassLow : r.glassHigh; },
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit;
+    const room = kit.room({ w: 11, d: 8, wall: 0x7d6e60 }); room.position.z = -.3; scene.add(room);
+    scene.add(kit.bench({ w: 5.8, d: 3.6, h: .8 }));
+    const plate = kit.roundedBox(5.5, .02, 3.3, .008, mat.matte(0x1c1a19, .55)); plate.position.y = .81; scene.add(plate);
+    const win = kit.windowLight({ from: [3, 3.6, -7], intensity: 1.3, w: 1.8, h: 1.9 }); win.group.position.set(2.8, 2.1, -4.27); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 7, 10, 2); lamp.position.set(-3.2, 2.6, 1.5); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .2));
+    const shelf = kit.shelf({ w: 1.8, h: 1.5 }); shelf.position.set(-3.3, 0, -4.0); scene.add(shelf);
+    const plant = kit.plant({ h: 1.0, leaves: 11 }); plant.position.set(-4.3, 0, -3.0); scene.add(plant);
+    const plant2 = kit.plant({ h: .55 }); plant2.position.set(-2.4, .81, -1.2); scene.add(plant2);
+
+    // eye model: group origin at the cornea; axis along +x
+    const eye = new THREE.Group(); eye.position.set(EX, EYE_Y, 0); scene.add(eye);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), kit.mat.glass(0xcfeaff, .2)); shell.castShadow = false; eye.add(shell);
+    const iris = new THREE.Mesh(new THREE.RingGeometry(PUPIL / 2 * S, 7 * S, 48), new THREE.MeshStandardMaterial({ color: 0x5a3a24, roughness: .6, side: THREE.DoubleSide }));
+    iris.rotation.y = -Math.PI / 2; iris.position.x = .6 * S; eye.add(iris);
+    const retina = new THREE.Mesh(new THREE.CircleGeometry(5.5 * S, 40), new THREE.MeshBasicMaterial({ color: 0xd9594c, side: THREE.DoubleSide, toneMapped: false }));
+    retina.rotation.y = -Math.PI / 2; eye.add(retina);
+    const retinaAnchor = kit.anchor(0, 5.5 * S + .12, 0); retina.add(retinaAnchor);
+    const cradle = new THREE.Mesh(new THREE.CylinderGeometry(.07, .1, EYE_Y - RAD_MM * S - .8, 20), mat.metal(0x6f757c, .45)); cradle.position.set(EX + 10 * S, (EYE_Y - RAD_MM * S + .8) / 2, 0); cradle.castShadow = true; scene.add(cradle);
+
+    // spectacle lens in a ring, just in front of the cornea
+    const glassHigh = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 1, thickness: .1, ior: 1.52, roughness: 0, metalness: 0, envMapIntensity: 1.6 });
+    const glassLow = kit.mat.glass(0xcfeaff, .3);
+    const lensMesh = new THREE.Mesh(new THREE.BufferGeometry(), glassHigh); lensMesh.rotation.z = -Math.PI / 2; lensMesh.position.set(EX - .05, EYE_Y, 0); scene.add(lensMesh);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.4, .014, 10, 48), mat.metal(0x3a3d41, .4)); ring.rotation.y = Math.PI / 2; ring.position.copy(lensMesh.position); ring.castShadow = true; scene.add(ring);
+    const post = kit.roundedBox(.05, EYE_Y - .4 - .8, .05, .01, mat.metal(0x3a3d41, .4)); post.position.set(EX - .05, (EYE_Y - .4 + .8) / 2, 0); scene.add(post);
+    const lensAnchor = kit.anchor(EX - .05, EYE_Y + .52, 0); scene.add(lensAnchor);
+
+    // distant object: a lamp panel far to the left, emitting parallel rays
+    const src = kit.roundedBox(.1, .8, .8, .02, mat.plastic(0x2b2f36, .4)); src.position.set(EX + RAY_X(-25) - .12, EYE_Y, 0); scene.add(src);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(.6, .6), mat.emissive(0xfff3d6, 1.4)); face.rotation.y = Math.PI / 2; face.position.set(EX + RAY_X(-25) - .068, EYE_Y, 0); scene.add(face);
+    const srcPost = kit.roundedBox(.12, EYE_Y - .4 - .8, .12, .02, mat.metal(0x6f757c, .4)); srcPost.position.set(src.position.x, (EYE_Y - .4 + .8) / 2, 0); scene.add(srcPost);
+
+    const rays = [], pasts = [];
+    for (let i = 0; i < 7; i++) {
+      const b = kit.beam(0xfff0c8, .0075, { boost: 1.5 }), p = kit.beam(0xfff0c8, .0075, { boost: 1.5 }); p.setOpacity(.28);
+      b.renderOrder = p.renderOrder = 10; scene.add(b, p); rays.push(b); pasts.push(p);
+    }
+    const focusDot = new THREE.Mesh(new THREE.SphereGeometry(.05, 20, 14), mat.emissive(0xffb454, 3)); scene.add(focusDot);
+    const focusAnchor = kit.anchor(0, .2, 0); focusDot.add(focusAnchor);
+
+    // retina picture monitor (front-right)
+    const { group: mon, screen } = kit.screenBezel(1.1, .69, { depth: .05 }); mon.position.set(2.35, 1.3, 1.0); mon.rotation.y = -.55; scene.add(mon);
+    const stand = kit.roundedBox(.08, .45, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(2.35, .8 + .2, .95); stand.rotation.y = -.55; scene.add(stand);
+    const foot = kit.roundedBox(.55, .03, .36, .01, mat.metal(0x6f757c, .4)); foot.position.set(2.35, .815, .98); foot.rotation.y = -.55; scene.add(foot);
+
+    return { eye, shell, retina, retinaAnchor, lensMesh, ring, lensAnchor, rays, pasts, focusDot, focusAnchor, screen, glassHigh, glassLow, lensP: null, lastM: null, kit, THREE };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m) {
+    if (r.lastM === m) return; r.lastM = m;
+    const L = s.eye * S;
+    r.shell.scale.set(L / 2, RAD_MM * S, RAD_MM * S); r.shell.position.x = L / 2;
+    r.retina.position.x = L;
+
+    // spectacle lens shape follows its power (rebuilt only when the power moved noticeably)
+    if (r.lensP === null || Math.abs(r.lensP - s.lens) > .04) {
+      r.lensP = s.lens; r.lensMesh.geometry.dispose(); r.lensMesh.geometry = lensGeometry(r.THREE, s.lens);
+    }
+    // rays from the model, in the x-y plane (scene x = mm * S + cornea x, y = height * S + eye height)
+    const to3 = ([x, h]) => [EX + x * S, EYE_Y + h * S, 0];
+    m.rays.forEach((ray, i) => {
+      r.rays[i].setPath(ray.pts.map(to3));
+      if (ray.past) r.pasts[i].setPath(ray.past.map(to3)); else r.pasts[i].setPath([]);
+    });
+    r.focusDot.position.set(EX + m.focus * S, EYE_Y, 0);
+    r.focusDot.visible = true;
+  },
+});
+
+function RAY_X(mm) { return mm * S; }
+
+function lensGeometry(THREE, P) {
+  // thin biconcave / biconvex profile revolved around the optical axis (Lathe axis = y, mesh is rotated to x)
+  const R = .36, tc = .03 + Math.max(P, 0) * .014, te = .03 + Math.max(-P, 0) * .014, pts = [], n = 14;
+  const th = r => tc + (te - tc) * (r / R) ** 2;
+  for (let i = 0; i <= n; i++) { const r = R * i / n; pts.push(new THREE.Vector2(r, th(r) / 2)); }
+  for (let i = n; i >= 0; i--) { const r = R * i / n; pts.push(new THREE.Vector2(r, -th(r) / 2)); }
+  return new THREE.LatheGeometry(pts, 40);
+}
+
+// ---------- Screen: what the retina sees ----------
+var chartCache; // var: drawn once during createExplainer, before this line would run
+function chartCanvas(w, h) {
+  if (chartCache) return chartCache;
+  const c = chartCache = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.fillStyle = '#f2eee6'; x.fillRect(0, 0, w, h); x.fillStyle = '#16120f'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '700 120px "JetBrains Mono", monospace';
+  x.fillText('E', w / 2, 100);
+  [['F P', 62, 190], ['T O Z', 44, 252], ['L P E D', 32, 300], ['P E C F D', 24, 338], ['E D F C Z P', 18, 368]].forEach(([t, px, y]) => { x.font = `700 ${px}px "JetBrains Mono", monospace`; x.fillText(t, w / 2, y); });
+  return c;
+}
+function drawRetina(ctx, s, m, r, w, h) {
+  const src = chartCanvas(w, h), radius = Math.min(26, m.blurUm / 14);   // blur disc radius in canvas px
+  ctx.globalAlpha = 1; ctx.fillStyle = '#0d1114'; ctx.fillRect(0, 0, w, h);
+  if (radius < .6) ctx.drawImage(src, 0, 0);
+  else { // defocus blur is a disc: average N samples on a disc (running mean keeps equal weights)
+    const N = 48, ga = 2.399963;
+    for (let i = 0; i < N; i++) { const rr = radius * Math.sqrt((i + .5) / N), a = i * ga; ctx.globalAlpha = 1 / (i + 1); ctx.drawImage(src, Math.cos(a) * rr, Math.sin(a) * rr); }
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = 'rgba(13,17,20,.82)'; ctx.fillRect(0, 0, w, 34);
+  ctx.font = '600 20px "JetBrains Mono", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#cfe3f0'; ctx.fillText('WHAT THE RETINA SEES', 14, 24);
+  ctx.textAlign = 'right'; ctx.fillStyle = m.sharp ? '#8fe388' : '#ff7a90'; ctx.fillText(m.sharp ? 'SHARP' : `BLURRED  ${m.blurUm.toFixed(0)} µm`, w - 14, 24);
+}
+</script>
+</body>
+</html>

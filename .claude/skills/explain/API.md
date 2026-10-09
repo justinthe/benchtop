@@ -25,7 +25,7 @@ Throws a readable error for a missing or mistyped required key. Required: `title
 | `narrate` | `(state, model) => html` | One paragraph, rewrites itself. May use `<b class="c-a">` with classes `c-a` cyan, `c-b` amber, `c-c` rose, `c-d` green. Throttled ~120 ms. Trusted HTML only. |
 | `controls` | array | See below. |
 | `modes` | `[{ name, state, camera, caption }]` | 2 to 5. Keys 1 to n. `state` is a **partial** state applied with a ~1.1 s tween; `camera` is a view name; `caption` shows above the narration. Touching any control clears the active mode. |
-| `views` | object | Name -> `{ label, pos, target }`. First is the default; **V** cycles in declaration order. |
+| `views` | object | Name -> `{ label, pos, target, phoneFit? }`. `phoneFit` (default 1) multiplies the camera distance in portrait, on top of the automatic back-off; use it when a view crops important parts on a phone. First is the default; **V** cycles in declaration order. |
 | `labels` | array | See below. Keep to 5 or fewer. |
 | `screens` | array | See below. |
 | `sound` | `{ ambient: 'room'|'outdoor'|'machine'|'none', ui: bool }` | Synthesized WebAudio. Muted state persists. |

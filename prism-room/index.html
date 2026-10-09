@@ -6,6 +6,7 @@
 <title>Prism Room — benchtop</title>
 <meta name="description" content="Why white light splits in a prism: refraction, minimum deviation, total internal reflection, and putting the colours back together.">
 <meta property="og:title" content="Prism Room"><meta property="og:description" content="Why white light splits in a prism."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="../lib/explainer.css">
 <script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
 </head>
@@ -54,7 +55,7 @@ createExplainer({
     { name: 'Rejoin', state: { prism: 0, light: 0, second: true }, camera: 'studio', caption: 'A mirror-image prism recombines the colours' },
   ],
   views: {
-    lab: { label: 'Lab', pos: [1.2, 2.3, 3.2], target: [-.05, 1.0, -.4] },
+    lab: { label: 'Lab', pos: [1.2, 2.3, 3.2], target: [-.05, 1.0, -.4], phoneFit: 1.5 },
     exploded: { label: 'Exploded', pos: [-.1, 5.2, .5], target: [-.2, 1.0, -.6] },
     studio: { label: 'Studio', pos: [.1, 1.6, 2.7], target: [.45, 1.1, -.1] },
   },

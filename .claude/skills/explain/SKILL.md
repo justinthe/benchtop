@@ -67,7 +67,7 @@ Fetch once at build time, reduce, write `<slug>/data.json`, record source and da
 - Write the topic's source link by setting `slug` in the config (footer links `../topics/<slug>.md`).
 
 ### 7. Verify (mandatory, see `VERIFY.md`)
-Run `tools/test.sh`, then the Chrome loop in `.claude/skills/explain/VERIFY.md`. **Max 3 fix iterations**, then report
+Run `tools/test.sh`, then the verify loop in `.claude/skills/explain/VERIFY.md` (Chrome extension, or `tools/verify.mjs` when it is not connected). **Max 3 fix iterations**, then report
 what remains. A page that was not opened in Chrome is not finished.
 
 ### 8. Capture
