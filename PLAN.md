@@ -293,7 +293,7 @@ After both reviews:
 
 ## 4. M3 — Skill v1 (`.claude/skills/explain/`)
 
-**Status (2026-10-09):** skill files written (`SKILL.md`, `API.md`, `STYLE.md`, `PATTERNS.md`, `VERIFY.md`, `examples.md`, runnable `template.html` + model shape files); helper tools `tools/meta.mjs` and `tools/test.sh` added. **Verified headlessly** (`tools/verify.mjs`, because the Chrome extension was disconnected): template, pendulum, prism-room, spectacles. **Acceptance run done:** `/explain topics/spectacles.md` followed by hand through the skill's own procedure produced `spectacles/` (model + 13 test groups, 4 modes, 3 views) with 3 layout fix iterations and 0 chat tweaks from the owner. Still open: a run by the skill itself in a fresh session, and `river-delta`.
+**Status (2026-10-09):** skill files written (`SKILL.md`, `API.md`, `STYLE.md`, `PATTERNS.md`, `VERIFY.md`, `examples.md`, runnable `template.html` + model shape files); helper tools `tools/meta.mjs` and `tools/test.sh` added. **Verified headlessly** (`tools/verify.mjs`, because the Chrome extension was disconnected): template, pendulum, prism-room, spectacles. **Acceptance run done:** `/explain topics/spectacles.md` followed by hand through the skill's own procedure produced `spectacles/` (model + asserts, 4 modes, 3 views) with 3 layout fix iterations and 0 chat tweaks from the owner. Still open: a run by the skill itself in a fresh session, and `river-delta`.
 
 ```
 SKILL.md        # frontmatter (name: explain, description triggers on "/explain <file.md>") + procedure PRD §9.2
