@@ -72,7 +72,7 @@ Data never goes from your memory straight into a page. It is baked once, with pr
   stylesheet) and edit values.
 - Section order inside the module: `Config` then `Build` then `Update`, with screen draw functions at the bottom.
 - Split into `<slug>/main.js` only if the page passes about 400 lines.
-- Respect API.md limits: sliders and 2 to 3 option toggles only (no dropdown yet), labels at most 5, one screen at least
+- Respect API.md limits: sliders, 2 to 3 option toggles, selects for longer lists, labels at most 5, one screen at least
   for explainers.
 - Write the topic's source link by setting `slug` in the config (footer links `../topics/<slug>.md`).
 
@@ -90,7 +90,8 @@ by views, desktop and phone), anything unresolved, anything you changed in `lib/
 
 ### 10. Learn (required, even if the answer is "nothing new")
 If the page introduced a scene recipe that worked, append it to `PATTERNS.md` (recipe, numbers, pitfalls). If you hit a
-trap, add it to the pitfalls list. Keep entries short and concrete.
+trap, add it to the pitfalls list. Keep entries short and concrete. If the write to `.claude/` is refused (unattended runs), put the exact entry you would
+have added in the report so a person can paste it.
 
 ## Iterate (chat tweaks to an existing page)
 Read the page, its `model.js`, and its tests first. Make the smallest edit that does the job. Model change: update the tests
@@ -99,10 +100,11 @@ and the Chrome loop on the affected mode and view, desktop plus phone width if l
 (`tools/meta.mjs` re-run keeps the original `created` date).
 
 ## Runtime gaps
-If the topic needs something the runtime lacks (a dropdown control, a new input type, a new camera behaviour):
+If the topic needs something the runtime lacks (a new input type, a new camera behaviour, a new screen option):
 1. Say so and propose the smallest addition to `lib/`.
 2. Add it to the runtime (not the page), with a case in `tools/check.mjs` if it has pure logic.
-3. Document it in `API.md` and re-run `tools/test.sh` plus both golden pages in Chrome (regression).
+3. Document it in `API.md` and re-run `tools/test.sh` (it syntax-checks `lib/` as ES modules) plus both golden pages through the verifier
+   (regression). Never put a `//` comment inside a one-line function: it swallows the closing brace and breaks every page.
 Never fork the runtime into a page.
 
 ## Hard rules

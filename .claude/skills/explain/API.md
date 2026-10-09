@@ -21,7 +21,7 @@ Throws a readable error for a missing or mistyped required key. Required: `title
 | `type` | string | `explainer | world | data | play` (informational). |
 | `state` | object | Initial state. Number values tween between modes; booleans and strings snap at the midpoint. Keys are also the URL-hash keys. |
 | `model` | `(state) => object` | **Pure.** Called whenever state changes. Return every number the page shows. |
-| `stats` | `[{ key, label, unit, fmt }]` | Exactly 3. `key` indexes the model result. `fmt` = decimals (default 1). Non-finite shows an em dash. `unit` is appended raw (include a leading space if wanted). |
+| `stats` | `[{ key, label, unit, fmt, signed? }]` | Exactly 3. `key` indexes the model result. `fmt` = decimals (default 1). `signed: true` prefixes `+` on positive values. Non-finite shows an em dash. `unit` is appended raw (include a leading space if wanted). |
 | `narrate` | `(state, model) => html` | One paragraph, rewrites itself. May use `<b class="c-a">` with classes `c-a` cyan, `c-b` amber, `c-c` rose, `c-d` green. Throttled ~120 ms. Trusted HTML only. |
 | `controls` | array | See below. |
 | `modes` | `[{ name, state, camera, caption }]` | 2 to 5. Keys 1 to n. `state` is a **partial** state applied with a ~1.1 s tween; `camera` is a view name; `caption` shows above the narration. Touching any control clears the active mode. |
@@ -44,11 +44,15 @@ Throws a readable error for a missing or mistyped required key. Required: `title
 
 ### controls
 ```js
-{ type: 'slider', key, label, min, max, step, unit, fmt, keys: ['[', ']'] }       // keys = [decrease, increase], Shift = x5
-{ type: 'toggle', key, label, options: ['Off', 'On'], values?: [false, true], keys: ['D'] }   // key cycles
+{ type: 'slider', key, label, min, max, step, unit, fmt, keys: ['[', ']'], patch? }   // keys = [decrease, increase], Shift = x5
+{ type: 'toggle', key, label, options: ['Off', 'On'], values?: [false, true], keys: ['D'], patch? }   // key cycles
+{ type: 'select', key, label, options: [{ value, label }] | ['a', 'b'], keys: ['R'], patch? }   // native <select>; key = next, Shift+key = previous
 ```
-A toggle's `values` default to `[false, true]` when the state value is boolean, else to `options`. **There is no dropdown
-or select control** and no more than about 3 toggle options fit. Slider keys must be single characters not already used
+A toggle's `values` default to `[false, true]` when the state value is boolean, else to `options`; about 3 toggle options fit, so use a
+**select** for longer lists (values must be strings: they go into the URL hash).
+Slider `min`, `max` and `step` may be **functions of state** (`s => range[s.item][0]`) for per-item ranges; they are re-read on every update.
+`patch: (value, state) => ({ ...extra keys })` sets more state together with the control's own key (for example a select that resets the
+amount to that item's default so the slider never sits outside the new range). Slider keys must be single characters not already used
 (1 to 9, V, H, ?, M are reserved).
 
 ### labels
@@ -65,7 +69,7 @@ overlap on screen. Pills hide when behind the camera, off-screen, occluded, or o
 { mesh: (refs) => Mesh | Mesh, size: [w, h], live?: bool, draw: (ctx, state, model, refs, w, h) => void }
 ```
 The runtime replaces `mesh.material` with a `MeshBasicMaterial` carrying the canvas texture. Redraws on state change; with
-`live: true` also every frame (use only for traces and animation; keep draw cheap). Put `kit` in `refs` if `draw` needs
+`live: true` also every frame (use only for traces and animation; keep draw cheap). `draw` may **return `false`** to skip the texture upload when nothing changed (throttle a live trace this way). Put `kit` in `refs` if `draw` needs
 `kit.chart`. Use font sizes >= 17 px on a 640 px canvas so text stays legible in 3D. Size canvases about 2x the on-screen size.
 
 ## Runtime features you get for free
@@ -141,5 +145,5 @@ All asset paths are relative so the site works under `/<repo>/` on GitHub Pages.
 (`../lib/...`).
 
 ## Not available yet
-Dropdown or select control; more than ~3 toggle options; free pointer-drag of scene objects (Play type); video or GIF
+More than ~3 toggle options (use a select); free pointer-drag of scene objects (Play type); video or GIF
 capture; per-label custom positioning in screen space.

@@ -16,6 +16,9 @@ recipes get appended at the bottom by step 10 of the procedure.
 10. Paraxial eye/lens bench: `spectacles/`
 11. A body lit from a fixed direction (custom shader): `moon-phases/`
 12. Data and GIS pages (baked data, terrain diorama, flood layer)
+13. Chemistry bench with a run trace and an energy diagram: `thermochemistry/`
+14. Data page from a baked table: `planet-weights/`
+15. GIS flood diorama from a real DEM: `valley-flood/`
 
 ## 1. Model-first page
 `model.js` (pure) -> `model.test.mjs` (asserts) -> page. The page never computes a displayed number itself.
@@ -105,9 +108,39 @@ Built by a cold session from `topics/moon-phases.md`; it is the reference for "o
   the quantity, values on labels, a screen with the table or chart, `source` in the config. Cross-check baked columns against a formula in the model test. Use a log scale when data spans
   decades and say so on the page.
 
+## 13. Chemistry bench: calorimeter, run trace, energy diagram (`thermochemistry/`)
+- Model: a species table (formula with state symbol, dHf, M) and a reaction list (reactants/products as [id, n], limiting reactant, amount range, vessel type,
+  expected table value for the tests). dH = sum(products) - sum(reactants); via elements = -sum(reactants) + sum(products); `run()` gives q, C, dT, clamped display
+  temperature and boil/freeze flags; `tempAt(res, t, loss)` gives the trace. Tests: every row against its table value, Hess invariance, worked numbers, energy conservation,
+  doubling, clamping, finite sweep, state symbols present.
+- A **select** for the item list with `patch: v => ({ mass: item[v].default })`, and a slider whose `min/max/step` are functions of the selected item.
+- **Run restart pattern**: in `update`, build a key from the inputs that define a run; when it changes, reset `t0` and the history. The screen trace is `live` but
+  returns `false` unless 50 ms passed (20 fps cap). Labels show the final value; the console shows the live one.
+- Hero feedback without new kit code: water emissive colour from the live excess temperature (warm or cool), a frost skin cylinder whose opacity follows cooling,
+  `kit.particles` steam whose opacity follows heat, a pulsing red ring for a locked state.
+- **Diagram screen on the back wall** (whiteboard, 960 x 576): keep the vertical scale true; reactants ledge left, products right, dashed elements line at 0; Direct = one
+  coloured arrow (warm down for exothermic, cool up for endothermic), Via elements = two dark legs with their sums. Lay out special cases (a Hess cycle, a water/steam pair)
+  by hand and check for text collisions in the screenshots: values under ledges collide with arrow labels when two levels are close. Fonts >= 25 px.
+- Diagram view: the board must sit between the title block (left ~31 %) and the panel (right ~26 %), so the camera stands well back (about 3.7 units for a 2-unit board).
+- Phone: calorimeter labels can sit on top of the board in the diagram view; keep labels anchored low on the hero or hide them in that view.
+
+## 14. Data page from a baked table (`planet-weights/`, built by a cold session)
+- One object per record: eight platform scales in a row; column height = the quantity on ONE fixed linear scale, record ball on top; an "Earth line" label as a reference.
+- The model test reads `data.json` and cross-checks the columns against physics (g = GM/R^2 within 1 %, Kepler within 2 %), so a mistyped row fails.
+- Second quantity on a screen: a log-log plot with the law's line (year vs distance). Footer `source` carries the provenance caveat verbatim.
+- It picked the item with a 1..8 slider because no select existed then; use a `select` now.
+
+## 15. GIS flood diorama from a real DEM (`valley-flood/`, built by a cold session)
+- Bake with `tools/bake/heightmap.py`; terrain with `cell: doc.cell_m` and 5x relief on a plinth with a skirt wall; contours every 100 m with a toggle.
+- Model: `floodFill` from the lowest cell; it also reports **"dry below water"** (cells at or below the level that are not connected), tinted amber, which makes the
+  hidden basin visible before it spills. The spill level is found, not hard-coded: the largest one-metre jump in flooded area; the rim cell and the basin behind it follow.
+- Stats: level, flooded km2, dry-below-water km2. Hotspots: highest, lowest, rim, basin (hidden after it floods), all with lon/lat from `geo.lonLat`.
+- Screen: flooded area vs level curve with the jump marked. Modes bracket the spill: one metre below and at the rim.
+
 ## 9. Pitfalls (each cost real time once)
 - Helpers that `build`, `update` or a screen `draw` call are executed **during** `createExplainer(...)`. Declare them as `function` declarations (hoisted),
   `var`, or above the call. A `const`/`let` below the call is a temporal-dead-zone `ReferenceError` and the page stays blank.
+- Unattended runs (`claude -p`) cannot write inside `.claude/` (protected): step 10 then belongs in the report verbatim.
 - `THREE.Clock` is deprecated in r186 (the runtime no longer uses it). Do not use it in pages; use `dt` from `update`.
 - A page that 404s on the favicon logs a console error: keep the inline `<link rel="icon" ...>` from the template.
 - The scripted verifier (`tools/verify.mjs`) clicks info labels through the DOM because a culled label can be off-screen.

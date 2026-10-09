@@ -293,6 +293,8 @@ After both reviews:
 
 ## 4. M3 — Skill v1 (`.claude/skills/explain/`)
 
+**Status (2026-10-09): done.** Cold sessions built `moon-phases/`, `planet-weights/`, `valley-flood/` from the skill alone (13 to 14 min, 1 to 2.2 USD each); `thermochemistry/` built through the skill in-session after adding a `select` control, state-dependent slider ranges and signed stats. Open: the iterate path is untested on a real change.
+
 **Status (2026-10-09):** skill files written (`SKILL.md`, `API.md`, `STYLE.md`, `PATTERNS.md`, `VERIFY.md`, `examples.md`, runnable `template.html` + model shape files); helper tools `tools/meta.mjs` and `tools/test.sh` added. **Verified headlessly** (`tools/verify.mjs`, because the Chrome extension was disconnected): template, pendulum, prism-room, spectacles. **Acceptance run done:** `/explain topics/spectacles.md` followed by hand through the skill's own procedure produced `spectacles/` (model + asserts, 4 modes, 3 views) with 3 layout fix iterations and 0 chat tweaks from the owner. Still open: a run by the skill itself in a fresh session, and `river-delta`.
 
 ```
@@ -334,6 +336,8 @@ SKILL.md procedure (condensed):
 ---
 
 ## 6. M5 — Data + GIS
+
+**Status (2026-10-09): done.** Bake tools (`tools/bake/`, 15 offline tests), `lib/geo.js`, GIS kit builders (cell-aspect aware), `source` credit. Acceptance pages built by cold `/explain` sessions and independently verified: `planet-weights/` (Data; table transcribed from memory of NASA's sheet, flagged, physics cross-checked) and `valley-flood/` (GIS World on a real USGS DEM). No internet in the sandbox: `fetch_json.py` is tested only against local files/server.
 
 - `tools/bake/` — stdlib-only scripts (Python `-I`, no deps): `heightmap.py` (DEM GeoTIFF/ASC → 16-bit PNG or JSON grid, downsampled), `geojson.py` (Douglas–Peucker simplify + project to local meters + quantize), `fetch_json.py` (fetch + reduce + record source/date).
 - Runtime: `kit.terrainFromHeights`, `kit.lineFromCoords` (rivers/roads as tubes/ribbons), `kit.extrudeFromPolygons` (buildings/zones).

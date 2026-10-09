@@ -59,6 +59,10 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 .bt-slider input::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .18); }
 .bt-slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
 .bt-slider input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+.bt-select { display: block; }
+.bt-select select { width: 100%; min-height: 44px; padding: 8px 10px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: 500 13px var(--sans); cursor: pointer; }
+.bt-select select:hover { background: rgba(255, 255, 255, .1); }
+.bt-select option { background: #211d1a; color: var(--ink); }
 .bt-tools { display: flex; gap: 6px; }
 .bt-tools .bt-btn { flex: 1; justify-content: center; }
 
