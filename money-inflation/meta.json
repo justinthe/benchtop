@@ -1,0 +1,14 @@
+{
+  "slug": "money-inflation",
+  "title": "Town Bank",
+  "kicker": "Why prices go up",
+  "type": "explainer",
+  "tags": [
+    "economics",
+    "money",
+    "inflation"
+  ],
+  "created": "2026-10-09",
+  "source": "topics/money-inflation.md",
+  "sourceSha256": "d23a9f05449469be7825035f962e01f36a0cbe76e8e631f852dde987a67a610b"
+}

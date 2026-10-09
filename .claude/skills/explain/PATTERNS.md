@@ -19,6 +19,7 @@ recipes get appended at the bottom by step 10 of the procedure.
 13. Chemistry bench with a run trace and an energy diagram: `thermochemistry/`
 14. Data page from a baked table: `planet-weights/`
 15. GIS flood diorama from a real DEM: `valley-flood/`
+16. Story longer than 5 modes, economics diorama: `money-inflation/`
 
 ## 1. Model-first page
 `model.js` (pure) -> `model.test.mjs` (asserts) -> page. The page never computes a displayed number itself.
@@ -154,3 +155,15 @@ Built by a cold session from `topics/moon-phases.md`; it is the reference for "o
 - A slider range that lets the beam miss the object produces NaN stats. Sweep every slider range in the model test.
 - `tweenState` snaps booleans at the midpoint; animate a boolean-driven prop yourself in `update` (damped follow) for smoothness.
 - Do not put spaces or `?` in state keys; keys become URL hash keys.
+
+## 16. Story longer than 5 modes; economics diorama (`money-inflation/`)
+- A 7-step story does not fit 2 to 5 modes: make it a `story` slider (0 = free play, 1..n) with keys B/N and `patch: v => STORY[v]` setting the other
+  sliders; every other slider gets `patch: () => ({ story: 0 })` so touching it leaves the story. Modes still bookmark key beats. The model rounds `story`
+  (mode tweens pass through fractional values).
+- A catch-up the model does not have (prices lagging new money) is shown as a per-step `adj` fraction in the model, and said in `assumptions`.
+- Values spanning 1x to 3000x: log-scale chart (say so on the board) and a piecewise stack height (linear to 3x, then log) so the hero stays readable.
+- Pitfall: label `show(s, m)` is re-evaluated only on **state** change, not on `setView`, so it cannot hide a label per camera view. Move the anchor instead
+  (low on the object, below the narration box).
+- Pitfall: a wide side-by-side scene (bank | street | shop) loses its left third to the title block. Put the key object centre-back (vault under the
+  wall board), low props on the left, and aim the default camera target about 0.5 units right of the scene centre.
+- `kit.shelf` comes filled with books; build your own boards when the shelf holds model-driven goods.
