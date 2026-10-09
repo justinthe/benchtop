@@ -1,21 +1,28 @@
 // Headless verify (fallback when the Claude-in-Chrome extension is unavailable, and handy in CI-less setups).
-//   PW_DIR=<dir containing node_modules/playwright-core> node tools/verify.mjs <slug> [--out <dir>] [--base http://localhost:8000] [--thumb]
-// Needs a running dev server (python3 tools/serve.py) and a Chrome at $CHROME or /usr/bin/google-chrome.
+//   node tools/verify.mjs <slug> [--out <dir>] [--base http://localhost:8000] [--thumb]
+// One-time setup: tools/setup-verify.sh (installs playwright-core in ~/.cache/benchtop-verify; override with PW_DIR or BENCHTOP_VERIFY_DIR).
+// Needs a running dev server (python3 tools/serve.py) and a Chrome/Chromium ($CHROME or a standard path).
 // Does the VERIFY.md loop: console errors/warnings, every mode x view (finite stats, screenshots), tier swap, keys, hash, phone width.
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 const argv = process.argv.slice(2), slug = argv[0];
+const PW_DIR = process.env.PW_DIR || process.env.BENCHTOP_VERIFY_DIR || join(homedir(), '.cache', 'benchtop-verify');
+const CHROME = [process.env.CHROME, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(p => p && existsSync(p));
 const opt = (k, d) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : d);
-if (!slug || !process.env.PW_DIR) { console.error('usage: PW_DIR=<dir with node_modules/playwright-core> node tools/verify.mjs <slug> [--out dir] [--base url] [--thumb]'); process.exit(2); }
+if (!slug) { console.error('usage: node tools/verify.mjs <slug> [--out dir] [--base url] [--thumb]   (first time: tools/setup-verify.sh)'); process.exit(2); }
+if (!existsSync(join(PW_DIR, 'node_modules', 'playwright-core'))) { console.error(`playwright-core not found in ${PW_DIR}. Run tools/setup-verify.sh once.`); process.exit(2); }
+if (!CHROME) { console.error('No Chrome/Chromium found. Install one or set CHROME=/path/to/chrome.'); process.exit(2); }
 const base = opt('--base', 'http://localhost:8000'), out = opt('--out', `verify-${slug}`), wantThumb = argv.includes('--thumb');
 mkdirSync(out, { recursive: true });
-const { chromium } = createRequire(process.env.PW_DIR + '/')('playwright-core');
+const { chromium } = createRequire(PW_DIR + '/')('playwright-core');
 
 const report = { slug, problems: [], notes: [], shots: [] };
 const bad = m => report.problems.push(m), note = m => report.notes.push(m);
-const browser = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: true,
+const browser = await chromium.launch({ executablePath: CHROME, headless: true,
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 
 async function pass(name, viewport, { phone = false } = {}) {

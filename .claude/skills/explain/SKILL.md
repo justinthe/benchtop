@@ -71,7 +71,7 @@ Run `tools/test.sh`, then the verify loop in `.claude/skills/explain/VERIFY.md` 
 what remains. A page that was not opened in Chrome is not finished.
 
 ### 8. Capture
-- `__bt.saveThumb()` from the best mode and view (writes `<slug>/thumb.jpg` through `tools/serve.py`).
+- Thumbnail: `node tools/verify.mjs <slug> --thumb` (mode 1, default view), or `__bt.saveThumb()` from the best mode and view in the extension.
 - `node tools/meta.mjs <slug> "<Title>" "<Kicker>" <type> <tag,tag>` writes `meta.json` (hashes the topic).
 
 ### 9. Report (short)

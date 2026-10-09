@@ -5,11 +5,13 @@ Run after every generate or iterate. Max **3 fix iterations**; then report what 
 `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__read_console_messages,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__tabs_close_mcp`.
 
 ## Fastest path: scripted headless check
-`PW_DIR=<dir containing node_modules/playwright-core> node tools/verify.mjs <slug> --out <dir> [--thumb]` runs steps 1 to 5 below in
-headless Chrome (software GL, real phone emulation at 390 x 844), writes screenshots to `<dir>`, and prints a JSON report with
-`problems` (exit code 1 if any). Use it when the Chrome extension is not connected, and as the first pass even when it is. You still
-**look at the screenshots** (step 3). Set up once: `npm i playwright-core` in a scratch directory (not in the repo) and point `PW_DIR` at it.
-The verifier is slow on pages with glass transmission (software rendering); that is normal.
+`node tools/verify.mjs <slug> --out verify-<slug> [--thumb]` runs steps 1 to 5 below in headless Chrome (software GL, real phone emulation at
+390 x 844), writes screenshots to the `--out` folder (git-ignored: any `verify-*/`), and prints a JSON report whose `problems` array must be
+empty (exit code 1 otherwise). Use it when the Chrome extension is not connected, and as the first pass even when it is. You still
+**look at the screenshots** (step 3): open at least the default view of mode 1, one mode with an edge state, and one phone shot with Read.
+`--thumb` also saves `<slug>/thumb.jpg` (mode 1, default view). One-time setup if it says playwright-core is missing: `tools/setup-verify.sh`
+(installs it outside the repo). The dev server must be running (`python3 tools/serve.py 8000`, background). The verifier is slow on pages with glass
+transmission (software rendering); that is normal, allow a few minutes.
 
 ## 0. Serve and test
 - `curl -s -o /dev/null -w "%{http_code}" localhost:8000/` . If it fails, start `python3 tools/serve.py 8000` with `run_in_background`.
