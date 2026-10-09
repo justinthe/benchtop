@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Valley Flood — benchtop</title>
+<meta name="description" content="Raise the water over a real East Tennessee landscape and watch it fill the lowest valley, wait behind a ridge, then spill over and claim far more land.">
+<meta property="og:title" content="Valley Flood"><meta property="og:description" content="Water fills a landscape valley by valley: one metre past a ridge rim can drown 192 km2 at once."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { gridToWorld } from '../lib/geo.js';
+import { makeModel } from './model.js';
+
+const doc = await (await fetch('./data.json')).json();
+const model = makeModel(doc), A = model({ level: doc.min });
+const SIZE = 4, EXAG = 5, PY = .8;                                                   // terrain width (scene units), vertical exaggeration, plinth top
+const widthM = (doc.w - 1) * doc.cell_m[0], HEIGHT = (A.max - A.min) * SIZE / widthM * EXAG;   // relief in scene units (true scale x EXAG)
+const yOf = elev => (elev - A.min) / (A.max - A.min) * HEIGHT;                          // metres -> terrain-local y
+const f = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
+const ll = p => `${Math.abs(p.lonlat[1]).toFixed(3)}° N, ${Math.abs(p.lonlat[0]).toFixed(3)}° W`;
+const jump = f(A.jumpKm2, 0), rim = A.spillLevel;
+
+createExplainer({
+  // ---------- Config ----------
+  slug: 'valley-flood', kicker: 'Where rising water goes', title: 'Valley Flood',
+  hook: 'Water fills a landscape one valley at a time. Raise it one metre too far and a whole hidden basin floods at once.',
+  type: 'world', fov: 40, bloom: .3, bloomThreshold: 1.0, environmentIntensity: .35,
+  state: { level: 300, contours: true },
+  model,
+  stats: [
+    { key: 'level', label: 'Water level', unit: ' m', fmt: 0 },
+    { key: 'floodedKm2', label: 'Flooded', unit: ' km²', fmt: 0 },
+    { key: 'dryBelowKm2', label: 'Dry below water', unit: ' km²', fmt: 0 },
+  ],
+  narrate: (s, m) => {
+    const lvl = `<b class="c-a">${m.level} m</b>`, area = `<b class="c-b">${f(m.floodedKm2, 0)} km²</b>`;
+    if (m.level >= rim && m.level < rim + 15) return `At ${lvl} the water has topped the ${rim} m rim and poured into the basin behind it. It now covers ${area}, ${jump} km² more than one metre lower. The amber land is gone: it was below the water all along, just walled off.`;
+    let t = `At ${lvl} the water covers ${area}, ${f(m.floodedPct, 0)}% of the map.`;
+    if (m.dryBelowKm2 >= 1) t += ` <b class="c-c">${f(m.dryBelowKm2, 0)} km²</b> of land lower than the water stays dry (amber), walled off behind higher ground.`;
+    if (!m.spilled) t += m.level >= rim - 40 ? ` The lowest gap in the ridge is at ${rim} m: ${rim - m.level} m more and it spills.` : ` A ridge holds a large basin back until ${rim} m.`;
+    else t += ' Only ground above the water is dry; the highest point is ' + A.max + ' m.';
+    return t;
+  },
+  controls: [
+    { type: 'slider', key: 'level', label: 'Water level', min: A.min, max: A.max, step: 1, unit: ' m', fmt: 0, keys: ['[', ']'] },
+    { type: 'toggle', key: 'contours', label: 'Contours', options: ['Off', 'On'], keys: ['C'] },
+  ],
+  modes: [
+    { name: 'River valley', state: { level: 300 }, camera: 'overview', caption: 'Low water stays in the valley floor' },
+    { name: 'Brim full', state: { level: rim - 1 }, camera: 'rim', caption: 'One metre below the lowest gap' },
+    { name: 'Spill', state: { level: rim }, camera: 'rim', caption: 'Over the rim, the basin floods' },
+    { name: 'High water', state: { level: 800 }, camera: 'map', caption: 'Only the ridges stay dry' },
+  ],
+  views: {
+    overview: { label: 'Overview', pos: [-.45, 4.6, 5.9], target: [-.45, .85, -.1], phoneFit: 1.9 },
+    rim: { label: 'Rim', pos: [1.1, 3.3, 2.0], target: [-1.1, .9, -.9], phoneFit: 1.6 },
+    map: { label: 'Map', pos: [-.3, 7.9, 1.2], target: [-.3, .8, .1], phoneFit: 1.6 },
+  },
+  labels: [
+    { anchor: r => r.anchors.high, text: () => `Highest ${A.high.elev} m`, priority: 3,
+      info: () => `Highest point of the map: <b>${A.high.elev} m</b> at ${ll(A.high)}. This is the 90 m cell average after downsampling, so a real summit may be a little higher.` },
+    { anchor: r => r.anchors.low, text: () => `Lowest ${A.low.elev} m`, priority: 4,
+      info: () => `Lowest point of the map: <b>${A.low.elev} m</b> at ${ll(A.low)}. All water in this model starts here and spreads to every connected cell at or below the level.` },
+    { anchor: r => r.anchors.rim, text: (s, m) => `Rim ${rim} m`, priority: 5,
+      info: () => `The lowest gap in the ridge that walls off the basin: <b>${rim} m</b> at ${ll(A.rim)}. Below ${rim} m the water cannot cross; at ${rim} m it pours through and the flooded area jumps by <b>${jump} km²</b>.` },
+    { anchor: r => r.anchors.basin, text: () => `Walled-off basin`, show: (s, m) => !m.spilled, priority: 2,
+      info: () => `A basin of <b>${f(A.basinKm2, 0)} km²</b> behind the ridge. Its floor is <b>${A.basinFloor.elev} m</b> at ${ll(A.basinFloor)}. Once the water passes that height the basin is below the water level but stays dry, because every way in crosses ground above the water until ${rim} m.` },
+  ],
+  screens: [{ mesh: r => r.screen, size: [640, 400], draw: drawCurve }],
+  sound: { ambient: 'room', ui: true },
+  source: { label: 'USGS 3-arc-second elevation (matplotlib sample data)', date: `baked ${doc.baked}` },
+  assumptions: `Terrain: USGS 3-arc-second (about 90 m) elevation data for part of East Tennessee (${ll({ lonlat: [doc.origin[0] + doc.w * doc.step[0], doc.origin[1] + doc.h * doc.step[1]] })} to ${ll({ lonlat: doc.origin })}), as shipped in matplotlib's sample data, public domain. Baked to ${doc.w} x ${doc.h} cells of ${f(doc.cell_m[0], 0)} m east by ${f(doc.cell_m[1], 0)} m north (each cell is the average of 4 x 4 source cells). Relief is exaggerated ${EXAG} times. The water is a connected fill: a cell floods when its elevation is at or below the level and it is linked, edge to edge, to the lowest cell (${A.low.elev} m). Land below the level that is not linked stays dry and is shown in amber. Area = flooded cells x cell size. The map edge is treated as a wall. The DEM is coarse, so this shows the idea, not a flood-risk map: no rainfall, river flow, dams, reservoirs or real flood levels are modelled, and the levels shown are far above any real flood.`,
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit, { w, h, values } = doc, cell = doc.cell_m;
+    const room = kit.room({ w: 13, d: 10, wall: 0x7d6e60 }); room.position.z = -1; scene.add(room);
+    const win = kit.windowLight({ from: [3, 4.2, -7], intensity: 1.6, w: 1.8, h: 1.9 }); win.group.position.set(3, 2.2, -5.98); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 8, 10, 2); lamp.position.set(-3.2, 3.2, 2.6); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .22));
+    const shelf = kit.shelf({ w: 1.8, h: 1.5 }); shelf.position.set(-4.4, 0, -5.4); scene.add(shelf);
+    const plant = kit.plant({ h: 1.1, leaves: 11 }); plant.position.set(4.3, 0, -3.6); scene.add(plant);
+
+    // plinth (museum block) with the terrain on top
+    const depth = kit.depthOf(w, h, SIZE, cell);
+    const block = kit.roundedBox(SIZE + .3, PY, depth + .3, .02, mat.matte(0x2c2724, .55)); block.position.y = PY / 2; scene.add(block);
+    const g = new THREE.Group(); g.position.y = PY + .02; scene.add(g);
+    const terrain = kit.terrainFromHeights(values, w, h, { size: SIZE, height: HEIGHT, cell }); g.add(terrain);
+    g.add(skirt(THREE, values, w, h, depth, new THREE.MeshStandardMaterial({ color: 0x4a3b2e, roughness: .85, side: THREE.DoubleSide })));
+    const base = new Float32Array(w * h * 3), c = new THREE.Color();
+    for (let i = 0; i < w * h; i++) { landColor((values[i] - A.min) / (A.max - A.min), c); base.set([c.r, c.g, c.b], i * 3); }
+
+    const contours = kit.contourLines(values, w, h, [300, 400, 500, 600, 700, 800, 900, 1000], { size: SIZE, height: HEIGHT, cell, color: 0x1b1713, opacity: .5 });
+    contours.castShadow = false; g.add(contours);
+
+    // water: the same grid at the water height; the index keeps only quads touching a flooded cell (land above the water hides the rest)
+    const wgeo = new THREE.PlaneGeometry(SIZE, depth, w - 1, h - 1); wgeo.rotateX(-Math.PI / 2);
+    const windex = new THREE.BufferAttribute(new Uint32Array((w - 1) * (h - 1) * 6), 1); wgeo.setIndex(windex);
+    const water = new THREE.Mesh(wgeo, new THREE.MeshStandardMaterial({ color: 0x3f93cf, transparent: true, opacity: .62, roughness: .12, metalness: .05, depthWrite: false }));
+    water.renderOrder = 2; water.castShadow = false; g.add(water);
+
+    // hotspot anchors on the ground (terrain-local coordinates)
+    const at = (p, dx = 0) => { const [x, z] = gridToWorld(p.c, p.r, w, h, SIZE, cell), a = kit.anchor(x + dx, yOf(p.elev) + .14, z); g.add(a); return a; };
+    const anchors = { high: at(A.high), low: at(A.low, -.35), rim: at(A.rim), basin: at(A.basinCentre) };
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .12, 8), mat.emissive(0xffb454, 1.5));   // amber marker at the rim
+    { const [x, z] = gridToWorld(A.rim.c, A.rim.r, w, h, SIZE, cell); pin.position.set(x, yOf(rim) + .06, z); g.add(pin); }
+
+    // area-vs-level monitor behind the diorama on a floor stand, tilted toward the default camera
+    const { group: mon, screen } = kit.screenBezel(1.6, 1.0, { depth: .05 }); mon.position.set(.9, 2.15, -2.9); mon.rotation.x = -.35; scene.add(mon);
+    const stand = kit.roundedBox(.08, 1.75, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(.9, .875, -3.0); scene.add(stand);
+    const foot = kit.roundedBox(.6, .03, .4, .01, mat.metal(0x6f757c, .4)); foot.position.set(.9, .015, -3.0); scene.add(foot);
+
+    return { kit, terrain, base, water, windex, contours, anchors, screen, lastLevel: null, lastMask: null };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m) {
+    r.contours.visible = !!s.contours;
+    if (r.lastMask === m.mask) return; r.lastMask = m.mask;
+    const { w, h, values } = doc, mask = m.mask, idx = r.windex.array, lvl = m.level;
+    let n = 0;
+    for (let row = 0; row < h - 1; row++) for (let col = 0; col < w - 1; col++) {
+      const a = row * w + col, b = a + w, cc = b + 1, d = a + 1;
+      if (mask[a] | mask[b] | mask[cc] | mask[d]) { idx[n++] = a; idx[n++] = b; idx[n++] = d; idx[n++] = b; idx[n++] = cc; idx[n++] = d; }
+    }
+    r.windex.needsUpdate = true; r.water.geometry.setDrawRange(0, n); r.water.visible = n > 0;
+    r.water.position.y = yOf(lvl) + .003;
+    r.kit.recolorTerrain(r.terrain, (t, i, c) => {
+      c.setRGB(r.base[i * 3], r.base[i * 3 + 1], r.base[i * 3 + 2]);
+      if (mask[i]) c.lerp(WET, .55); else if (values[i] <= lvl) c.lerp(DRY, .6);
+    });
+  },
+});
+
+// ---------- Helpers (function declarations: called during createExplainer) ----------
+var WET, DRY, curveX, curveY;
+function landColor(t, c) {   // hypsometric tints: valley green, slope olive, ridge tan
+  if (!WET) { WET = c.clone().set(0x123a5a); DRY = c.clone().set(0xe0962e); }
+  return t < .35 ? c.setRGB(.17, .30, .13).lerp(c.clone().setRGB(.30, .36, .17), t / .35)
+    : c.setRGB(.30, .36, .17).lerp(c.clone().setRGB(.50, .42, .28), Math.min(1, (t - .35) / .65));
+}
+// Side walls closing the terrain down to the plinth top (terrain-local coordinates, y = 0 at the lowest point).
+function skirt(THREE, v, w, h, depth, material) {
+  const pos = [], edge = [];
+  for (let c = 0; c < w; c++) edge.push([c, 0]); for (let r = 1; r < h; r++) edge.push([w - 1, r]);
+  for (let c = w - 2; c >= 0; c--) edge.push([c, h - 1]); for (let r = h - 2; r >= 0; r--) edge.push([0, r]);
+  const p = ([c, r]) => [(c / (w - 1) - .5) * SIZE, yOf(v[r * w + c]), (r / (h - 1) - .5) * depth];
+  for (let i = 0; i < edge.length - 1; i++) {
+    const a = p(edge[i]), b = p(edge[i + 1]);
+    pos.push(a[0], -.02, a[2], b[0], -.02, b[2], b[0], b[1], b[2], a[0], -.02, a[2], b[0], b[1], b[2], a[0], a[1], a[2]);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  return new THREE.Mesh(g, material);
+}
+
+// ---------- Screen: flooded area against water level ----------
+function drawCurve(ctx, s, m, r, w, h) {
+  const { chart } = r.kit, area = { x: 78, y: 62, w: w - 110, h: h - 132 }, rx = { x: [A.min, A.max], y: [0, A.totalKm2] };
+  if (!curveX) { curveX = Array.from(m.curve, (_, k) => A.min + k); curveY = Array.from(m.curve); }
+  const px = L => area.x + (L - A.min) / (A.max - A.min) * area.w, py = a => area.y + area.h - a / A.totalKm2 * area.h;
+  chart.clear(ctx, w, h); chart.grid(ctx, area, 4, 4);
+  chart.text(ctx, 'FLOODED AREA vs WATER LEVEL', 22, 36, { size: 21, color: '#cfe3f0' });
+  ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffb454'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px(rim), area.y); ctx.lineTo(px(rim), area.y + area.h); ctx.stroke(); ctx.setLineDash([]);
+  chart.text(ctx, `+${jump} km² at ${rim} m`, px(rim) + 10, area.y + 24, { size: 18, color: '#ffb454' });
+  chart.line(ctx, area, curveX, curveY, rx, { color: '#7fd3ff', width: 4.5 });
+  const x = px(m.level), y = py(m.floodedKm2);
+  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, area.y + area.h); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+  for (const L of [300, 500, 700, 900]) chart.text(ctx, String(L), px(L), area.y + area.h + 26, { size: 17, align: 'center' });
+  chart.text(ctx, 'level, m', area.x + area.w, h - 14, { size: 17, align: 'right' });
+  for (const a of [0, 400, 800]) chart.text(ctx, String(a), area.x - 10, py(a) + 6, { size: 17, align: 'right' });
+  chart.text(ctx, 'km²', area.x - 10, area.y - 8, { size: 17, align: 'right' });
+  chart.text(ctx, `${m.level} m  ${f(m.floodedKm2, 0)} km²`, 22, h - 14, { size: 20, color: '#ffffff' });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "slug": "thermochemistry",
+  "title": "Heat Bench",
+  "kicker": "Why reactions get hot or cold",
+  "type": "explainer",
+  "tags": [
+    "chemistry",
+    "thermochemistry",
+    "energy",
+    "hess-law"
+  ],
+  "created": "2026-10-09",
+  "source": "topics/thermochemistry.md",
+  "sourceSha256": "be8246188b2082f5893cecbc463c4c7a02f20e538dd8f3f2fccb49206cda00a6"
+}

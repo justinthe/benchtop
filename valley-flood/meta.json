@@ -1,0 +1,14 @@
+{
+  "slug": "valley-flood",
+  "title": "Valley Flood",
+  "kicker": "Where rising water goes",
+  "type": "world",
+  "tags": [
+    "gis",
+    "terrain",
+    "hydrology"
+  ],
+  "created": "2026-10-09",
+  "source": "topics/valley-flood.md",
+  "sourceSha256": "8f7826c07c9b4db3f04eabc944ddc26efd4db4aa8a338b7e51ce16a9e035aec3"
+}

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Heat Bench — benchtop</title>
+<meta name="description" content="Why some reactions get hot and others get cold: pick a reaction, watch a calorimeter, and see the same energy on a Hess's-law diagram.">
+<meta property="og:title" content="Heat Bench"><meta property="og:description" content="Enthalpy of reaction and Hess's law on a lab bench."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { model, reactions, byId, species, sideLabel, tempAt, ROOM } from './model.js';
+
+const BENCH = .8, CAL_Y = BENCH + .03;                       // bench top, calorimeter base
+const f1 = v => (Number.isFinite(v) ? v.toFixed(1) : '—'), sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1);
+const bare = formula => formula.replace(/\((g|l|s|aq|graphite)\)/g, '');
+// reader-facing wording per reaction (words only; every number comes from model.js)
+const WORDS = {
+  methane: ['Burning', 'methane'], propane: ['Burning', 'propane'], ethanol: ['Burning', 'ethanol'], glucose: ['Burning', 'glucose'],
+  hydrogen: ['Burning', 'hydrogen'], 'hydrogen-steam': ['Burning', 'hydrogen'], 'cold-pack': ['Dissolving', 'ammonium nitrate'], thermite: ['Reacting', 'iron oxide with aluminium'],
+};
+const CLASSES = { exo: 'c-c', endo: 'c-a' };
+
+createExplainer({
+  // ---------- Config ----------
+  slug: 'thermochemistry', kicker: 'Why reactions get hot or cold', title: 'Heat Bench',
+  hook: 'Every substance carries an energy price tag. A reaction\'s heat is the price of the products minus the price of the reactants, whatever route you take.',
+  type: 'explainer', fov: 38, bloom: .3, bloomThreshold: 1.0, environmentIntensity: .4,
+  state: { rxn: 'methane', mass: 1, water: 1000, loss: false, route: 'direct' },
+  model,
+  stats: [
+    { key: 'dH', label: 'ΔH', unit: ' kJ/mol', fmt: 1, signed: true },
+    { key: 'q', label: 'Heat to bath', unit: ' kJ', fmt: 1, signed: true },
+    { key: 'Tshown', label: 'Final temp', unit: ' °C', fmt: 1 },
+  ],
+  narrate: (s, m) => {
+    if (m.locked) return `Nobody can burn carbon and stop at CO: it carries on to CO₂, so the calorimeter has nothing to measure. Hess's law gets the answer anyway: burning carbon gives <b class="c-b">${sg(m.cycle.burnC)} kJ</b>, burning CO gives <b class="c-b">${sg(m.cycle.burnCO)} kJ</b>, so carbon to CO must be the difference, <b class="c-c">${sg(m.cycle.result)} kJ/mol</b>.`;
+    const [verb, noun] = WORDS[m.id], hot = m.q > 0, k = hot ? CLASSES.exo : CLASSES.endo;
+    let t = `${verb} ${m.mass.toFixed(2)} g of ${noun} ${hot ? 'gives out' : 'takes in'} <b class="${k}">${Math.abs(m.q).toFixed(1)} kJ</b>. `;
+    t += `That ${hot ? 'warms' : 'cools'} the ${s.water.toFixed(0)} mL bath by <b class="c-b">${Math.abs(m.dT).toFixed(1)} °C</b>, from ${ROOM.toFixed(1)} to <b class="c-b">${m.Tfinal.toFixed(1)} °C</b>. `;
+    if (m.boils) t += 'The water would boil, so the thermometer stops at 100 °C. ';
+    if (m.freezes) t += 'The water would freeze, so the thermometer stops at 0 °C. ';
+    t += `On the diagram the products sit <b class="${k}">${Math.abs(m.dH).toFixed(1)} kJ per mole</b> ${m.exo ? 'below' : 'above'} the reactants, and the same ${m.exo ? 'drop' : 'climb'} appears whether you go straight there or through the elements.`;
+    if (m.pair) t += ` Make ${m.id === 'hydrogen' ? 'steam instead of liquid water' : 'liquid water instead of steam'} and the heat changes by <b class="c-a">${m.pair.gap.toFixed(1)} kJ/mol</b>: steam keeps that energy until it condenses.`;
+    if (s.loss) t += ' With heat loss on, the reading drifts back toward 25 °C, which is why real calorimetry needs a correction.';
+    return t;
+  },
+  controls: [
+    { type: 'select', key: 'rxn', label: 'Reaction', options: reactions.map(r => ({ value: r.id, label: r.label })), keys: ['R'], patch: v => ({ mass: byId[v].def }) },
+    { type: 'slider', key: 'mass', label: 'Amount', min: s => byId[s.rxn].range[0], max: s => byId[s.rxn].range[1], step: s => (byId[s.rxn].range[1] - byId[s.rxn].range[0]) / 200, unit: ' g', fmt: 2, keys: ['[', ']'] },
+    { type: 'slider', key: 'water', label: 'Water bath', min: 50, max: 1000, step: 10, unit: ' mL', fmt: 0, keys: [';', "'"] },
+    { type: 'toggle', key: 'loss', label: 'Heat loss', options: ['Off', 'On'], keys: ['L'] },
+    { type: 'toggle', key: 'route', label: 'Route', options: ['Direct', 'Via elements'], values: ['direct', 'via'], keys: ['E'] },
+  ],
+  modes: [
+    { name: 'Burn methane', state: { rxn: 'methane', mass: 1, water: 1000, loss: false, route: 'direct' }, camera: 'flask', caption: 'Exothermic: heat flows into the bath' },
+    { name: 'Cold pack', state: { rxn: 'cold-pack', mass: 5, water: 100, loss: false, route: 'direct' }, camera: 'flask', caption: 'Endothermic: the bath pays the heat' },
+    { name: 'Hess shortcut', state: { rxn: 'carbon-to-co', mass: 0, water: 1000, loss: false, route: 'via' }, camera: 'diagram', caption: 'Measure two reactions, get a third' },
+    { name: 'Water or steam?', state: { rxn: 'hydrogen-steam', mass: .2, water: 1000, loss: false, route: 'direct' }, camera: 'diagram', caption: 'State symbols matter: 44 kJ' },
+  ],
+  views: {
+    bench: { label: 'Bench', pos: [1.7, 2.3, 3.1], target: [-.05, 1.05, -.2], phoneFit: 1.3 },
+    flask: { label: 'Flask', pos: [.75, 1.85, 1.9], target: [-.05, 1.08, 0], phoneFit: 1.15 },
+    diagram: { label: 'Diagram', pos: [0, 1.95, .45], target: [0, 1.95, -3.27], phoneFit: 1.15 },
+  },
+  labels: [
+    { anchor: r => r.probeAnchor, text: (s, m) => (m.locked ? 'No reading' : `Water ${f1(m.Tshown)} °C`), priority: 4 },
+    { anchor: r => r.chamberAnchor, text: (s, m) => (m.locked ? 'Cannot be measured' : `${bare(species[m.r.limiting].formula)} ${m.mass.toFixed(2)} g`), priority: 3 },
+    { anchor: r => r.bodyAnchor, text: (s, m) => `Heat to bath ${sg(m.q)} kJ`, show: (s, m) => !m.locked, priority: 2,
+      info: () => 'Sign convention: ΔH is the reaction\'s own energy change. Negative ΔH means the reaction gives heat to its surroundings, so the bath warms (heat to bath is positive). Positive ΔH means it takes heat from the bath, which cools.' },
+    { anchor: r => r.balanceAnchor, text: (s, m) => `${m.mass.toFixed(2)} g`, show: (s, m) => !m.locked, priority: 1 },
+  ],
+  screens: [
+    { mesh: r => r.consoleScreen, size: [640, 380], live: true, draw: drawTrace },
+    { mesh: r => r.boardScreen, size: [960, 576], draw: drawDiagram },
+    { mesh: r => r.balanceScreen, size: [256, 96], draw: drawBalance },
+    { mesh: r => r.labelScreen, size: [256, 160], draw: drawBottle },
+  ],
+  sound: { ambient: 'room', ui: true },
+  assumptions: 'Textbook standard enthalpies of formation at 298 K and 1 bar, exactly as listed in the topic; elements in their standard state have zero formation enthalpy. ΔH of reaction = sum of products minus sum of reactants (per mole of reaction as written). The limiting reactant reacts completely. The bath: water at 4.184 J/g·K; the sealed (bomb) vessel adds 1.0 kJ/K and ignores the reactant mass; the cold-pack cup counts the dissolved salt as extra water and has no vessel term. The trace rises with a 1.2 s mixing time; heat loss uses a 60 s time constant shown at 10x speed. Displayed temperatures stop at 0 and 100 °C (the narration says when water would freeze or boil). Not modelled: bond energies, activation energy, entropy, real bomb-calorimeter corrections.',
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit;
+    const room = kit.room({ w: 10, d: 6, wall: 0x857464 }); room.position.z = -.3; scene.add(room);
+    scene.add(kit.bench({ w: 3.6, d: 1.6, h: BENCH, color: 0x5f6468, legColor: 0x2b2623 }));   // grey lab worktop
+    const win = kit.windowLight({ from: [3, 3.4, -6], intensity: 1.6, w: 1.6, h: 1.8 }); win.group.position.set(2.6, 2.0, -3.28); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 7, 9, 2); lamp.position.set(-2.4, 2.5, 1.6); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .22));
+    const shelf = kit.shelf({ w: 1.6, h: 1.4 }); shelf.position.set(-3.2, 0, -3.0); scene.add(shelf);
+    for (let i = 0; i < 4; i++) { const g = new THREE.Mesh(new THREE.CylinderGeometry(.07, .09, .26 + i * .04, 20), mat.glass(0xd8f0ff, .3)); g.position.set(-3.75 + i * .32, 1.4 + .13 + i * .02, -3.0); scene.add(g); }
+    const plant = kit.plant({ h: 1.0, leaves: 11 }); plant.position.set(-4.2, 0, -2.2); scene.add(plant);
+
+    // calorimeter (hero): glass Dewar wall, water, lid, stirrer, probe, sealed chamber, frost skin
+    const cal = new THREE.Group(); cal.position.set(0, CAL_Y, 0); scene.add(cal);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(.38, .4, .04, 48), mat.matte(0x2a2623, .7)); base.position.y = .02; base.receiveShadow = true; cal.add(base);
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(.34, .34, .5, 48, 1, true), kit.mat.glass(0xdff2ff, .2)); wall.position.y = .29; cal.add(wall);
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x2c6c95, roughness: .15, metalness: 0, transparent: true, opacity: .6, emissive: 0x000000 });
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(.32, .32, .36, 48), waterMat); water.position.y = .23; cal.add(water);
+    const frostMat = new THREE.MeshStandardMaterial({ color: 0xeaf6ff, roughness: 1, transparent: true, opacity: 0, depthWrite: false });
+    const frost = new THREE.Mesh(new THREE.CylinderGeometry(.347, .347, .48, 48, 1, true), frostMat); frost.position.y = .28; cal.add(frost);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .045, 48), mat.plastic(0x2b2f36, .5)); lid.position.y = .565; lid.castShadow = true; cal.add(lid);
+    const lockMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff5a5a, emissiveIntensity: 0, toneMapped: false });
+    const lockRing = new THREE.Mesh(new THREE.TorusGeometry(.33, .008, 8, 64), lockMat); lockRing.rotation.x = Math.PI / 2; lockRing.position.y = .59; cal.add(lockRing);
+    const stirrer = new THREE.Group(); stirrer.position.set(-.15, 0, .05); cal.add(stirrer);
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(.008, .008, .6, 8), mat.metal(0xb8bcc2, .3)); rod.position.y = .38; stirrer.add(rod);
+    const paddle = new THREE.Mesh(new THREE.BoxGeometry(.12, .03, .006), mat.metal(0xb8bcc2, .3)); paddle.position.y = .12; stirrer.add(paddle);
+    const motor = kit.roundedBox(.08, .08, .08, .01, mat.plastic(0x3a3d41, .5)); motor.position.y = .7; stirrer.add(motor);
+    const probe = new THREE.Mesh(new THREE.CylinderGeometry(.01, .01, .55, 10), mat.metal(0xd0d4d8, .25)); probe.position.set(.16, .38, -.08); cal.add(probe);
+    const probeHead = kit.roundedBox(.06, .1, .06, .01, mat.plastic(0xe8e4dc, .5)); probeHead.position.set(.16, .69, -.08); cal.add(probeHead);
+    const probeAnchor = kit.anchor(.16, .9, -.08); cal.add(probeAnchor);
+    const chamber = new THREE.Mesh(new THREE.CylinderGeometry(.085, .085, .22, 24), mat.metal(0x9aa0a6, .35)); chamber.position.set(.02, .2, .06); cal.add(chamber);
+    const chamberAnchor = kit.anchor(-.35, .48, .2); cal.add(chamberAnchor);
+    const bodyAnchor = kit.anchor(.42, .25, .1); cal.add(bodyAnchor);
+
+    // steam wisps above the lid (shown when the bath is hot)
+    const steam = kit.particles(46, { size: .05, color: 0xf2f2f2, step: (i, p, dt) => {
+      p.y += dt * (.12 + (i % 5) * .02); p.x += Math.sin(p.y * 6 + i) * dt * .03;
+      if (p.y > CAL_Y + 1.2 || p.y < CAL_Y + .55) p.set((((i * 37) % 11) / 11 - .5) * .4, CAL_Y + .6 + ((i * 13) % 7) / 7 * .5, (((i * 53) % 9) / 9 - .5) * .3);
+    } });
+    steam.material.opacity = 0; scene.add(steam);
+
+    // balance with the reagent bottle (label + display are canvas screens)
+    const bal = new THREE.Group(); bal.position.set(-1.05, BENCH, .25); scene.add(bal);
+    const balBody = kit.roundedBox(.46, .09, .36, .02, mat.plastic(0xe8e4dc, .5)); balBody.position.y = .045; bal.add(balBody);
+    const pan = new THREE.Mesh(new THREE.CylinderGeometry(.15, .15, .012, 32), mat.metal(0xc9ccd0, .3)); pan.position.set(0, .1, -.03); pan.castShadow = true; bal.add(pan);
+    const { group: balDisp, screen: balanceScreen } = kit.screenBezel(.2, .075, { depth: .02, border: .01 }); balDisp.position.set(0, .06, .181); balDisp.rotation.x = -.35; bal.add(balDisp);
+    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(.07, .075, .2, 28), new THREE.MeshPhysicalMaterial({ color: 0x8a4b14, roughness: .15, transparent: true, opacity: .8, clearcoat: 1 }));
+    bottle.position.set(0, .206, -.03); bottle.castShadow = true; bal.add(bottle);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, .04, 20), mat.plastic(0x1f1f1f, .5)); cap.position.set(0, .326, -.03); bal.add(cap);
+    const labelScreen = new THREE.Mesh(new THREE.PlaneGeometry(.11, .07), new THREE.MeshBasicMaterial()); labelScreen.position.set(0, .2, .046); bal.add(labelScreen);
+    const balanceAnchor = kit.anchor(0, .48, -.03); bal.add(balanceAnchor);
+
+    // console with the live trace
+    const { group: con, screen: consoleScreen } = kit.screenBezel(.86, .51, { depth: .05 }); con.position.set(1.12, BENCH + .4, -.2); con.rotation.y = -.45; scene.add(con);
+    const stand = kit.roundedBox(.07, .34, .05, .01, mat.metal(0x6f757c, .4)); stand.position.set(1.12, BENCH + .17, -.24); stand.rotation.y = -.45; scene.add(stand);
+    const foot = kit.roundedBox(.45, .03, .3, .01, mat.metal(0x6f757c, .4)); foot.position.set(1.12, BENCH + .015, -.22); foot.rotation.y = -.45; scene.add(foot);
+
+    // whiteboard with the energy diagram, on the back wall
+    const { group: board, screen: boardScreen } = kit.screenBezel(2.0, 1.2, { depth: .04, border: .04, color: 0xbfc3c7 }); board.position.set(0, 1.95, -3.27); scene.add(board);
+
+    return { cal, water, waterMat, frostMat, lockMat, stirrer, steam, probeAnchor, chamber, chamberAnchor, bodyAnchor, balanceAnchor, consoleScreen, boardScreen, balanceScreen, labelScreen,
+      runKey: '', t0: 0, now: 0, temp: ROOM, hist: [], lastDraw: -1, kit };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m, dt, t) {
+    r.now = t;
+    const key = `${m.id}|${m.mass}|${s.water}|${s.loss}`;
+    if (key !== r.runKey) { r.runKey = key; r.t0 = t; r.hist.length = 0; }    // any change to the run restarts it
+    const tr = t - r.t0; r.temp = tempAt(m, tr, s.loss);
+    if (!r.hist.length || tr - r.hist[r.hist.length - 1][0] > .05) { r.hist.push([tr, r.temp]); if (r.hist.length > 600) r.hist.shift(); }
+
+    const ex = r.temp - ROOM;                                                  // excess over room temperature
+    const warm = Math.min(1, Math.max(0, ex / 40)), cool = Math.min(1, Math.max(0, -ex / 8));
+    r.waterMat.emissive.setRGB(1 * warm * .9 + .1 * cool, .45 * warm + .35 * cool, .12 * warm + 1 * cool);
+    r.waterMat.emissiveIntensity = Math.max(warm, cool) * 1.2;
+    r.frostMat.opacity = cool * .55;
+    r.steam.material.opacity = Math.min(.55, Math.max(0, (r.temp - 40) / 40));
+    if (r.steam.material.opacity > 0) r.steam.update(dt);
+    r.lockMat.emissiveIntensity = m.locked ? 1.6 + Math.sin(t * 3) * .4 : 0;
+    r.chamber.visible = m.r.vessel !== 'cup';
+    r.stirrer.rotation.y += dt * (m.locked ? 0 : 4);
+  },
+});
+
+// ---------- Screens ----------
+function drawTrace(ctx, s, m, r, w, h) {
+  if (r.now - r.lastDraw < .05 && r.lastDraw >= 0) return false;              // at most 20 redraws per second
+  r.lastDraw = r.now;
+  const { chart } = r.kit; chart.clear(ctx, w, h);
+  if (m.locked) {
+    chart.text(ctx, 'NO MEASUREMENT', w / 2, 150, { size: 34, color: '#ff7a90', align: 'center' });
+    chart.text(ctx, 'Carbon burns on to CO₂.', w / 2, 210, { size: 20, color: '#cfe3f0', align: 'center' });
+    chart.text(ctx, 'See the Hess cycle on the board.', w / 2, 244, { size: 20, color: '#cfe3f0', align: 'center' });
+    return;
+  }
+  const a = { x: 70, y: 96, w: w - 96, h: h - 140 }, span = 20, lo = Math.min(ROOM, m.Tshown) - 2, hi = Math.max(ROOM, m.Tshown) + 2;
+  chart.grid(ctx, a, 4, 4);
+  ctx.setLineDash([6, 6]); chart.line(ctx, a, [0, span], [ROOM, ROOM], { x: [0, span], y: [lo, hi] }, { color: 'rgba(207,227,240,.45)', width: 2 }); ctx.setLineDash([]);
+  const pts = r.hist.filter(p => p[0] <= span);
+  chart.line(ctx, a, pts.map(p => p[0]), pts.map(p => p[1]), { x: [0, span], y: [lo, hi] }, { color: m.q >= 0 ? '#ffb454' : '#7fd3ff', width: 5 });
+  chart.text(ctx, `${r.temp.toFixed(1)} °C`, 70, 64, { size: 44, color: '#ffffff' });
+  chart.text(ctx, m.boils ? 'WATER WOULD BOIL' : m.freezes ? 'WATER WOULD FREEZE' : `→ ${m.Tshown.toFixed(1)} °C`, w - 24, 52, { size: 20, color: m.boils || m.freezes ? '#ff7a90' : '#cfe3f0', align: 'right' });
+  chart.text(ctx, `${hi.toFixed(0)}°`, a.x - 8, a.y + 14, { size: 17, color: '#cfe3f0', align: 'right' });
+  chart.text(ctx, `${lo.toFixed(0)}°`, a.x - 8, a.y + a.h, { size: 17, color: '#cfe3f0', align: 'right' });
+  chart.text(ctx, '0 s', a.x, h - 16, { size: 17, color: '#cfe3f0' }); chart.text(ctx, `${span} s`, a.x + a.w, h - 16, { size: 17, color: '#cfe3f0', align: 'right' });
+}
+
+function drawDiagram(ctx, s, m, r, w, h) {
+  const INK = '#26221d', WARM = '#cf4f20', COOL = '#2a74c4', HI = '#c98a12';
+  ctx.fillStyle = '#f3f0ea'; ctx.fillRect(0, 0, w, h);
+  const T = (str, x, y, size = 30, color = INK, align = 'left', weight = 600) => { ctx.font = `${weight} ${size}px "JetBrains Mono", monospace`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(str, x, y); };
+  const arrow = (x, y0, y1, color, dashed) => {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 6; ctx.setLineDash(dashed ? [14, 10] : []);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1 - Math.sign(y1 - y0) * 18); ctx.stroke(); ctx.setLineDash([]);
+    const d = Math.sign(y1 - y0) || 1; ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x - 13, y1 - d * 22); ctx.lineTo(x + 13, y1 - d * 22); ctx.closePath(); ctx.fill();
+  };
+  const ledge = (x0, x1, y, text, value, color = INK, alpha = 1) => {
+    ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    T(text, (x0 + x1) / 2, y - 14, 28, color, 'center'); T(value, (x0 + x1) / 2, y + 30, 25, color, 'center', 500); ctx.globalAlpha = 1;
+  };
+  T(m.equation, w / 2, 46, 32, INK, 'center', 700);
+  const vals = m.cycle ? [0, -110.5, -393.5] : m.pair ? [m.levels.reactants, m.pair.liquid, m.pair.steam, 0] : [m.levels.reactants, m.levels.products, 0];
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * .16 + 1, top = 110, bot = h - 60;
+  const Y = v => top + (hi + pad - v) / (hi - lo + 2 * pad) * (bot - top);
+  // elements reference line
+  ctx.setLineDash([8, 8]); ctx.strokeStyle = 'rgba(38,34,29,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(40, Y(0)); ctx.lineTo(w - 40, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  T('elements = 0', w - 44, Y(0) - 10, 23, 'rgba(38,34,29,.6)', 'right', 500);
+  T('kJ/mol', 44, top - 16, 23, 'rgba(38,34,29,.6)', 'left', 500);
+
+  if (m.cycle) {                                                                  // Hess cycle for C -> CO (vertical scale stays true)
+    ledge(70, 300, Y(0), 'C(graphite) + O₂(g)', '0');
+    ledge(430, 670, Y(-110.5), 'CO(g) + ½ O₂(g)', '?', HI);
+    ledge(700, 920, Y(-393.5), 'CO₂(g)', '−393.5');
+    ctx.setLineDash([6, 8]); ctx.strokeStyle = 'rgba(38,34,29,.3)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(110, Y(-393.5)); ctx.lineTo(700, Y(-393.5)); ctx.stroke(); ctx.setLineDash([]);
+    arrow(110, Y(0), Y(-393.5), INK); T(`measured ${sg(m.cycle.burnC)}`, 126, (Y(0) + Y(-393.5)) / 2 + 40, 26, INK, 'left', 700);
+    arrow(650, Y(-110.5), Y(-393.5), INK); T(`measured ${sg(m.cycle.burnCO)}`, 664, (Y(-110.5) + Y(-393.5)) / 2, 26, INK, 'left', 700);
+    arrow(280, Y(0), Y(-110.5), HI, true); T(`${sg(m.cycle.result)} (Hess)`, 294, Y(-110.5) + 44, 28, HI, 'left', 700);
+    T('unknown = first measured − second measured', w / 2, h - 20, 25, INK, 'center', 500);
+    return;
+  }
+  const exoColor = m.exo ? WARM : COOL, R = m.levels.reactants;
+  if (m.pair) {                                                                   // water vs steam side by side
+    const selSteam = m.id === 'hydrogen-steam', yS = Y(m.pair.steam), yL = Y(m.pair.liquid);
+    ledge(60, 300, Y(R), sideLabel(m.r.reactants), sg(R));
+    ledge(420, 600, yS, 'H₂O(g)', sg(m.pair.steam), selSteam ? exoColor : INK, selSteam ? 1 : .45);
+    ledge(640, 820, yL, 'H₂O(l)', sg(m.pair.liquid), selSteam ? INK : exoColor, selSteam ? .45 : 1);
+    arrow(360, Y(R), Y(m.levels.products), exoColor); T(`ΔH ${sg(m.dH)}`, 348, (Y(R) + Y(m.levels.products)) / 2, 30, exoColor, 'right', 700);
+    ctx.setLineDash([5, 6]); ctx.strokeStyle = HI; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(600, yS); ctx.lineTo(840, yS); ctx.moveTo(820, yL); ctx.lineTo(840, yL); ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(840, yS); ctx.lineTo(840, yL); ctx.stroke();
+    T(m.pair.gap.toFixed(1), 852, (yS + yL) / 2 - 2, 28, HI, 'left', 700); T('kJ', 852, (yS + yL) / 2 + 26, 24, HI, 'left', 700);
+    T('steam keeps 44.0 kJ/mol until it condenses', w / 2, h - 20, 25, INK, 'center', 500);
+    return;
+  }
+  ledge(90, 330, Y(R), sideLabel(m.r.reactants), `${sg(R)}`);
+  const P = m.levels.products; ledge(630, 870, Y(P), sideLabel(m.r.products), `${sg(P)}`);
+  if (s.route === 'direct') {
+    arrow(480, Y(R), Y(P), exoColor); T(`ΔH ${sg(m.dH)} kJ/mol`, 496, (Y(R) + Y(P)) / 2 + 8, 32, exoColor, 'left', 700);
+    T(m.exo ? 'downhill: heat given out (exothermic)' : 'uphill: heat taken in (endothermic)', w / 2, h - 20, 25, INK, 'center', 500);
+  } else {
+    ctx.globalAlpha = .25; arrow(480, Y(R), Y(P), exoColor); ctx.globalAlpha = 1;
+    arrow(400, Y(R), Y(0), INK); T(`${sg(m.via.down)}`, 388, (Y(R) + Y(0)) / 2 + 8, 28, INK, 'right', 700);
+    arrow(560, Y(0), Y(P), INK); T(`${sg(m.via.up)}`, 572, (Y(0) + Y(P)) / 2 + 8, 28, INK, 'left', 700);
+    T(`${sg(m.via.down)} + (${sg(m.via.up)}) = ${sg(m.via.total)} kJ/mol, same as direct`, w / 2, h - 20, 26, exoColor, 'center', 700);
+  }
+}
+
+function drawBalance(ctx, s, m, r, w, h) {
+  ctx.fillStyle = '#0b1a12'; ctx.fillRect(0, 0, w, h);
+  ctx.font = '500 52px "JetBrains Mono", monospace'; ctx.fillStyle = '#8fe388'; ctx.textAlign = 'right';
+  ctx.fillText(m.locked ? '----' : `${m.mass.toFixed(2)} g`, w - 14, 68);
+}
+
+function drawBottle(ctx, s, m, r, w, h) {
+  ctx.fillStyle = '#f2ede2'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#26221d'; ctx.textAlign = 'center';
+  const f = m.locked ? 'C' : bare(species[m.r.limiting].formula);
+  ctx.font = `700 ${f.length > 7 ? 40 : 56}px "JetBrains Mono", monospace`; ctx.fillText(f, w / 2, 86);
+  ctx.font = '500 20px "JetBrains Mono", monospace'; ctx.fillText(m.locked ? 'graphite' : `${(species[m.r.limiting].M).toFixed(2)} g/mol`, w / 2, 130);
+}
+</script>
+</body>
+</html>

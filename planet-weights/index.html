@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planet Scales — benchtop</title>
+<meta name="description" content="Your mass never changes, but your weight does. See the same body on all eight planets.">
+<meta property="og:title" content="Planet Scales"><meta property="og:description" content="Your mass never changes, but your weight does. See the same body on all eight planets."><meta property="og:image" content="thumb.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%237fd3ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/explainer.css">
+<script type="importmap">{"imports":{"three":"../lib/three.module.js","three/addons/":"../lib/addons/"}}</script>
+</head>
+<body>
+<script type="module">
+import { createExplainer } from '../lib/explainer.js';
+import { makeModel, loadPlanets } from './model.js';
+
+const data = await (await fetch('./data.json')).json();
+const planets = loadPlanets(data);
+
+const H_PER_N = 0.00042, SLOT = 0.42, BENCH_Y = 0.8;   // scene units per newton (linear, fixed), spacing of the scales
+const COLORS = { Mercury: 0x9a9086, Venus: 0xd9b27a, Earth: 0x3f78c4, Mars: 0xc1593a, Jupiter: 0xc9a27c, Saturn: 0xdcc48a, Uranus: 0x8fd3d6, Neptune: 0x4a63c9 };
+const f = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '—');
+
+createExplainer({
+  // ---------- Config ----------
+  slug: 'planet-weights', kicker: 'Same body, other worlds', title: 'Planet Scales',
+  hook: 'Your mass is the same everywhere. Your weight is only the pull of the ground under you.',
+  type: 'data', fov: 38, bloom: .3, environmentIntensity: .35,
+  state: { mass: 70, pick: 3, order: 'distance' },
+  model: makeModel(planets),
+  stats: [
+    { key: 'weightN', label: 'Weight there', unit: ' N', fmt: 0 },
+    { key: 'kgf', label: 'Reads as', unit: ' kgf', fmt: 1 },
+    { key: 'ratio', label: 'Versus Earth', unit: ' ×', fmt: 2 },
+  ],
+  narrate: (s, m) => `A body of <b class="c-a">${f(s.mass)} kg</b> weighs <b class="c-b">${f(m.weightN)} N</b> on ${m.name}${m.gas ? ' (at the 1-bar level; a gas giant has no surface)' : ''}. ${m.name === 'Earth' ? 'That is the home reading.' : `That is <b class="c-c">${f(m.ratio, 2)} ×</b> its Earth weight.`} A bathroom scale would say ${f(m.kgf, 1)} kgf, a unit that is just newtons divided by 9.81. One ${m.name} year lasts ${f(m.year, 2)} Earth years.`,
+  controls: [
+    { type: 'slider', key: 'mass', label: 'Mass', min: 30, max: 120, step: 1, unit: ' kg', fmt: 0, keys: ['[', ']'] },
+    { type: 'slider', key: 'pick', label: 'Scale', min: 1, max: 8, step: 1, unit: ' of 8', fmt: 0, keys: [',', '.'] },
+    { type: 'toggle', key: 'order', label: 'Order by', options: ['Distance', 'Gravity'], values: ['distance', 'gravity'], keys: ['S'] },
+  ],
+  modes: [
+    { name: 'On Earth', state: { mass: 70, pick: 3, order: 'distance' }, camera: 'row', caption: 'Home: about 686 newtons' },
+    { name: 'Lightest', state: { mass: 70, pick: 1, order: 'gravity' }, camera: 'low', caption: 'Mercury, with Mars a hair behind' },
+    { name: 'Heaviest', state: { mass: 70, pick: 8, order: 'gravity' }, camera: 'row', caption: 'Jupiter pulls hardest' },
+  ],
+  views: {
+    row: { label: 'Row', pos: [.1, 2.2, 5.1], target: [.35, 1.65, 0], phoneFit: 1.9 },
+    low: { label: 'Low', pos: [.1, 1.2, 4.1], target: [.35, 1.35, 0], phoneFit: 1.9 },
+    top: { label: 'Top', pos: [.3, 4.6, 3.4], target: [.3, .85, -.9], phoneFit: 1.7 },
+  },
+  labels: [
+    { anchor: r => r.focusA, text: (s, m) => `${m.name} ${f(m.weightN)} N`, priority: 3,
+      info: (s, m) => `Weight = mass × surface gravity: ${f(s.mass)} kg × ${m.g} m/s² = ${f(m.weightN)} N. ${m.gas ? 'Gravity here is quoted at the 1-bar pressure level, since a gas giant has no solid surface.' : 'Gravity is G·M/R² for this planet, from its mass and radius.'}` },
+    { anchor: r => r.earthA, text: (s, m) => `Earth line ${f(m.earthN)} N`, show: (s, m) => m.name !== 'Earth', priority: 1 },
+  ],
+  screens: [{ mesh: r => r.screen, size: [640, 400], draw: drawYear }],
+  sound: { ambient: 'room', ui: true },
+  source: { label: 'NASA Planetary Fact Sheet (unverified transcription)', date: data.retrieved, url: 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/' },
+  assumptions: `Weight = mass × surface gravity, using each planet's equatorial gravity from the table. Jupiter, Saturn, Uranus and Neptune are gas giants: their gravity is at the 1-bar level, not a surface. The data was transcribed from memory of NASA's Planetary Fact Sheet without internet access; the tests check it (g = GM/R² within 1 %, Kepler's T² = a³ within 2 %), but it should be verified against the sheet. Rotation and moons are ignored. Column height is linear in newtons on one fixed scale for every mass (Jupiter is about 6.7 × Mars); the planet balls are all the same size and are not to scale. Kilograms-force is newtons divided by 9.80665.`,
+  occluders: r => r.columns,
+
+  // ---------- Build ----------
+  build(scene, kit) {
+    const { THREE, mat } = kit;
+    const room = kit.room({ w: 9, d: 7 }); room.position.z = -.5; scene.add(room);
+    scene.add(kit.bench({ w: 4.0, d: 1.4, h: BENCH_Y }));
+    const win = kit.windowLight({ from: [2.6, 3.4, -5.2], intensity: 2 }); win.group.position.set(1.9, 1.9, -3.98); scene.add(win.group);
+    const lamp = new THREE.PointLight(0xffc88a, 9, 10, 2); lamp.position.set(-2.2, 2.6, 1.8); scene.add(lamp);
+    scene.add(new THREE.HemisphereLight(0xfff1dc, 0x3a2f28, .22));
+    const shelf = kit.shelf(); shelf.position.set(-3.1, 0, -3.2); scene.add(shelf);
+    const plant = kit.plant({ h: .7 }); plant.position.set(-2.6, BENCH_Y, -.45); scene.add(plant);
+
+    const items = {}, columns = [];
+    for (const p of planets) {
+      const g = new THREE.Group(); scene.add(g);
+      const base = kit.roundedBox(.34, .05, .34, .012, mat.metal(0x3a3d41, .45)); base.position.y = BENCH_Y + .025; g.add(base);
+      const colMat = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: .4, emissive: 0xffb454, emissiveIntensity: 0 });
+      const col = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), colMat); col.castShadow = true; col.receiveShadow = true; g.add(col); columns.push(col);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(.07, 32, 24), mat.plastic(COLORS[p.name], .5)); ball.castShadow = true; g.add(ball);
+      const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const c = cv.getContext('2d');
+      c.font = '700 34px "Barlow Condensed", Inter, sans-serif'; c.fillStyle = '#e8e4dc'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(p.name.toUpperCase(), 128, 34);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(.36, .09), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+      plate.rotation.x = -Math.PI / 2; plate.position.set(0, BENCH_Y + .004, .32); g.add(plate);
+      items[p.name] = { g, col, colMat, ball, x: null, h: 0 };
+    }
+
+    const earthLine = new THREE.Mesh(new THREE.BoxGeometry(SLOT * 8, .008, .008), mat.emissive(0xffb454, 1.5)); earthLine.position.z = .24; scene.add(earthLine);
+    const earthA = kit.anchor(); scene.add(earthA);
+    const focusA = kit.anchor(); scene.add(focusA);
+
+    const { group, screen } = kit.screenBezel(1.5, .94); group.position.set(.3, 2.8, -.6); scene.add(group);
+    const stand = kit.roundedBox(.08, 1.6, .06, .01, mat.metal(0x6f757c, .4)); stand.position.set(.3, BENCH_Y + .8, -.66); scene.add(stand);
+    return { items, columns, earthLine, earthA, focusA, screen, kit, inited: false };
+  },
+
+  // ---------- Update ----------
+  update(r, s, m, dt) {
+    const k = r.inited ? 1 - Math.exp(-dt * 7) : 1; r.inited = true;
+    m.rows.forEach((row, rank) => {
+      const it = r.items[row.name], tx = (rank - 3.5) * SLOT, th = row.weightN * H_PER_N, focus = rank === m.focusIdx;
+      it.x = it.x === null ? tx : it.x + (tx - it.x) * k; it.h += (th - it.h) * k;
+      it.g.position.x = it.x; it.col.scale.set(.1, Math.max(it.h, .001), .1); it.col.position.y = BENCH_Y + .05 + it.h / 2;
+      it.ball.position.y = BENCH_Y + .05 + it.h + .075; it.colMat.emissiveIntensity = focus ? .55 : 0;
+      if (focus) r.focusA.position.set(it.x, BENCH_Y + .05 + it.h + .24, 0);
+    });
+    r.earthLine.position.set(0, BENCH_Y + .05 + m.earthN * H_PER_N, .24); r.earthA.position.set(SLOT * 3.2, r.earthLine.position.y + .1, .24);
+  },
+});
+
+// ---------- Screens ----------
+function drawYear(ctx, s, m, r, w, h) {
+  const { chart } = r.kit, area = { x: 84, y: 84, w: w - 112, h: h - 140 };
+  const X = [Math.log10(.3), Math.log10(40)], Y = [Math.log10(.2), Math.log10(250)];
+  const px = au => area.x + (Math.log10(au) - X[0]) / (X[1] - X[0]) * area.w, py = yr => area.y + area.h - (Math.log10(yr) - Y[0]) / (Y[1] - Y[0]) * area.h;
+  chart.clear(ctx, w, h); chart.grid(ctx, area, 4, 4);
+  const law = [.3, 1, 3, 10, 40];
+  chart.line(ctx, area, law.map(Math.log10), law.map(a => Math.log10(a ** 1.5)), { x: X, y: Y }, { color: 'rgba(255,180,84,.55)', width: 3 });
+  for (const row of m.rows) {
+    const foc = row.name === m.name;
+    ctx.fillStyle = foc ? '#ffffff' : '#7fd3ff'; ctx.beginPath(); ctx.arc(px(row.au), py(row.year), foc ? 11 : 6, 0, Math.PI * 2); ctx.fill();
+  }
+  chart.text(ctx, 'YEAR vs DISTANCE', area.x, 32, { size: 22, color: '#cfe3f0' });
+  chart.text(ctx, `${m.name}: ${f(m.year, 2)} yr at ${f(m.au, 2)} AU`, area.x, 62, { size: 20, color: '#ffb454' });
+  chart.text(ctx, 'distance from Sun (AU, log)', area.x + area.w, h - 14, { size: 17, color: '#cfe3f0', align: 'right' });
+  chart.text(ctx, '250 yr', area.x - 8, area.y + 10, { size: 17, color: '#cfe3f0', align: 'right' });
+  chart.text(ctx, '0.2', area.x - 8, area.y + area.h, { size: 17, color: '#cfe3f0', align: 'right' });
+  chart.text(ctx, 'year = AU^1.5', area.x + 10, area.y + area.h - 14, { size: 17, color: 'rgba(255,180,84,.9)' });
+}
+</script>
+</body>
+</html>

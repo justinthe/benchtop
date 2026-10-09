@@ -1,0 +1,14 @@
+{
+  "slug": "planet-weights",
+  "title": "Planet Scales",
+  "kicker": "Same body, other worlds",
+  "type": "data",
+  "tags": [
+    "astronomy",
+    "gravity",
+    "data"
+  ],
+  "created": "2026-10-09",
+  "source": "topics/planet-weights.md",
+  "sourceSha256": "1205759a933daf8e92dfb2397a49f6601bd9386f48e5b148adb9f9e3c191b146"
+}
