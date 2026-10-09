@@ -15,6 +15,7 @@ recipes get appended at the bottom by step 10 of the procedure.
 9. Pitfalls (read before the verify loop)
 10. Paraxial eye/lens bench: `spectacles/`
 11. A body lit from a fixed direction (custom shader): `moon-phases/`
+12. Data and GIS pages (baked data, terrain diorama, flood layer)
 
 ## 1. Model-first page
 `model.js` (pure) -> `model.test.mjs` (asserts) -> page. The page never computes a displayed number itself.
@@ -91,6 +92,18 @@ Built by a cold session from `topics/moon-phases.md`; it is the reference for "o
 - A head-sized Earth whose nose turns toward the Moon makes the "view from Earth" screen meaningful.
 - Orbit-scale scenes are small on a phone: `phoneFit` about 2 on the overview and 1.35 on a top view. Keep sunbeams as short stubs by the lamp; full-length
   beams read as bars.
+
+## 12. Data and GIS pages
+- **Pipeline**: raw file in `data-src/` -> `tools/bake/*` -> `<slug>/data.json` (with provenance) -> `model.js` takes the parsed document as an input and computes everything shown
+  (still pure) -> the page does `await fetch('./data.json')` then `createExplainer`. The Node test reads the same `data.json` with `fs` and checks it, so a bad bake fails `tools/test.sh`.
+- **Terrain diorama** (World): `kit.plinth`, `kit.terrainFromHeights(values, w, h, {size, height, cell: doc.cell_m})`; vertical exaggeration = `height` (state it in `assumptions`), `kit.contourLines`
+  at round levels, `kit.heightSampler` to stand hotspots on the ground, `geo.argExtreme` and `geo.lonLat` for real-coordinate hotspots (highest and lowest points).
+- **Flood or threshold layer**: the model computes `mask = floodFill(values, w, h, level, [seedIndex])` and `areaKm2`; the page repaints with `kit.recolorTerrain` only when the level changed
+  (blue where `mask[i]`) and draws a translucent water plane at `level`. Seed from `argExtreme(values, 'min')`. Show the flooded area as a stat chip.
+- **Scene units**: terrain `size` about 4 to 6; one constant converts metres to scene units; labels use real place names only if they are in the data, otherwise lon/lat.
+- **Data page** (metaphor driven by a table): one physical object per record (columns, stacks, spheres on rails; `buildingsInstanced` for many), a control that sorts, filters or switches
+  the quantity, values on labels, a screen with the table or chart, `source` in the config. Cross-check baked columns against a formula in the model test. Use a log scale when data spans
+  decades and say so on the page.
 
 ## 9. Pitfalls (each cost real time once)
 - Helpers that `build`, `update` or a screen `draw` call are executed **during** `createExplainer(...)`. Declare them as `function` declarations (hoisted),

@@ -51,9 +51,19 @@ If the topic is too broad for one page, build the first slice it names and say w
 Print a short plan: kicker / title / hook, scene metaphor and hero object, controls (key, range, unit, keys), 3 stats, modes
 (name, state, view), 3 views, labels, screens, what is simplified. Then continue.
 
-### 5. Bake data (data and GIS pages only)
-Fetch once at build time, reduce, write `<slug>/data.json`, record source and date for the footer and `meta.json`.
-(Baking tools arrive in a later milestone; until then do this inline and keep `data.json` small, < 300 KB.)
+### 5. Bake data (data, world and GIS pages)
+Data never goes from your memory straight into a page. It is baked once, with provenance, into `<slug>/data.json`:
+- Raw inputs live in `data-src/` (its README lists what is there and the licence). **There may be no internet**: check
+  `curl -s -m 8 -o /dev/null -w "%{http_code}" https://example.com`; `000` means offline. Offline, use what is in `data-src/` and say so; never invent
+  "real" data, never use the user's personal files (Downloads, work folders), and say clearly what is a stand-in.
+- Tools (stdlib Python, run with `python3 -I`; each prints a one-line summary):
+  - `tools/bake/heightmap.py <dem.npz|.npy|.asc> -o <slug>/data.json --size 128 --source "..." --license "..."` (downsamples; adds `cell_m`, `origin`, `step`, min/max)
+  - `tools/bake/geojson.py <in.geojson> -o <slug>/data.json --tolerance 10 --source "..."` (local metres, simplified)
+  - `tools/bake/fetch_json.py <url|file> -o <slug>/data.json --select a.b --keep f1,f2 --source "..."` (JSON or CSV; records URL, date, sha256)
+- Load in the page with top-level `await`: `const data = await (await fetch('./data.json')).json();` before `createExplainer`, and pass `source: { label, date, url? }`.
+- **Validate the data in the model tests**, not only the code: ranges, cross-checks between columns (for example Kepler's law, g = GM/r^2), grid sanity (min/max, orientation),
+  and that every record the page shows exists. The test reads `data.json` with `fs`, so a transcription or bake error fails `tools/test.sh`.
+- Keep `data.json` under 300 KB and put the origin in `assumptions`.
 
 ### 6. Generate the page
 - `mkdir <slug>`, then copy `.claude/skills/explain/template.html` to `<slug>/index.html`. Your real `model.js` and

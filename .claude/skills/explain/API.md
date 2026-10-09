@@ -29,6 +29,7 @@ Throws a readable error for a missing or mistyped required key. Required: `title
 | `labels` | array | See below. Keep to 5 or fewer. |
 | `screens` | array | See below. |
 | `sound` | `{ ambient: 'room'|'outdoor'|'machine'|'none', ui: bool }` | Synthesized WebAudio. Muted state persists. |
+| `source` | `{ label, date, url?, note? }` | Credit for baked data: footer "Data: label · date" (desktop; links to `url`) and a "Data source" block in the help overlay. **Required on Data and GIS pages.** |
 | `assumptions` | html string | Shown in the help overlay under "How this works". Always supply it. |
 | `occluders` | `(refs) => Mesh[]` | Meshes that hide labels behind them (raycast, ~5 Hz). Optional. |
 | `onTier` | `(refs, tier) => void` | Called after every quality-tier change (`high | med | low`). Swap expensive materials here. |
@@ -100,7 +101,14 @@ args; do not mutate a shared material, create your own instead).
 - `shelf({w,h,d,boards,color})`, `plant({h,leaves,potColor,leafColor})`, `floorTiles(size,tiles,a,b)`, `plinth(r,h,color)`.
 - `knob(r,h,color)` rotate `.rotation.y`; `sliderRail(len,color)` with `.setValue(0..1)`.
 - `screenBezel(w,h,{depth,border,color})` returns `{ group, screen }`; screen plane faces +z. Give `screen` to a `screens[].mesh`.
-**Terrain and city** `noiseHeights(w,h,{scale,octaves,seed,falloff})` -> Float32Array; `terrainFromHeights(heights,w,h,{size,height,colorFn})` -> Mesh;
+**Terrain and GIS** (all take the baked heightmap `cell_m` as `cell: [east_m, north_m]` so non-square DEM cells keep their true aspect; `size` = terrain width in scene units)
+- `terrainFromHeights(heights, w, h, {size, height, colorFn, cell})` -> Mesh (vertex colours; lowest sample y = 0, highest = `height`); `depthOf(w,h,size,cell)` = its depth.
+- `heightSampler(heights, w, h, {size, height, cell})` -> `(x, z) => y` to stand things on the ground; `recolorTerrain(mesh, (t01, i, color) => ...)` repaints in place (flood layers, overlays);
+  `contourLines(heights, w, h, levels, {size, height, cell, color, opacity})` -> LineSegments (levels in original units, for example metres).
+- `lineFromCoords([[x,z],..], {width, color, groundY, lift, closed})` -> flat ribbon (rivers, roads) lifted onto the ground by `groundY`.
+- `extrudeFromPolygons([{rings:[outer, hole..], height?, y?, color?}], {height, color, groundY})` -> ONE merged Mesh (buildings, zones); `y` = base height.
+- Older helpers: `noiseHeights`, `lowPolyBuilding`, `buildingsInstanced`.
+**Terrain and city (older)** `noiseHeights(w,h,{scale,octaves,seed,falloff})` -> Float32Array; `terrainFromHeights(heights,w,h,{size,height,colorFn})` -> Mesh;
 `lowPolyBuilding(w,h,d,color)`; `buildingsInstanced([{x,z,w,d,h,y?}], color)` -> one InstancedMesh.
 **Lines and flow** `tube(points,r,mat,segments)`, `pipe(points,r,mat)`, `cable(a,b,sag,r,mat)`, `arrow(dir,len,color,r)` (`.setLength(l)`),
 `particles(count,{size,color,step})` (call `.update(dt)`; `step(i,p,dt)` mutates the Vector3 `p`),
@@ -109,6 +117,11 @@ args; do not mutate a shared material, create your own instead).
 **2D chart helpers (for screens)** `kit.chart.{clear(ctx,w,h,bg), text(ctx,str,x,y,{size,color,align,font}), grid(ctx,rect,nx,ny),
 line(ctx,rect,xs,ys,{x:[lo,hi],y:[lo,hi]},{color,width}), bars(ctx,rect,values,max,{color,gap}), spectrum(ctx,rect,from,to)}`.
 `rect` is `{x,y,w,h}` in canvas pixels.
+
+## geo.js (DOM-free grid helpers, tested in tools/check-geo.mjs)
+`sample(v,w,h,c,r)` bilinear; `contourSegments(v,w,h,level)` marching squares; `floodFill(v,w,h,level,seedIndices)` -> Uint8Array mask of cells at or below `level` 4-connected to a seed (a basin behind a rim stays dry until the level passes the rim);
+`count(mask)`, `areaKm2(mask, cellXm, cellYm)`, `slopeDeg(v,w,h,cellXm,cellYm)`, `argExtreme(v,'min'|'max',pred?)` (cell index), `lonLat(doc,c,r)` (real coordinates of a cell of a baked heightmap),
+`gridToWorld(c,r,w,h,size,cell)` (grid position to scene x,z), `idx`. Row 0 of a baked heightmap is the **north** row.
 
 ## pure.js (DOM-free, unit-tested in tools/check.mjs)
 `clamp`, `lerp`, `ease`, `createStore`, `tweenState`, `encodeHash`, `decodeHash`, `pickTier`, `tierDown`, `TIERS`, `wavelengthToRGB(nm)`.
@@ -120,7 +133,8 @@ line(ctx,rect,xs,ys,{x:[lo,hi],y:[lo,hi]},{color,width}), bars(ctx,rect,values,m
 <slug>/model.test.mjs    node:assert tests (run by tools/test.sh)
 <slug>/meta.json         tools/meta.mjs
 <slug>/thumb.jpg         __bt.saveThumb()
-<slug>/data.json         baked data (data/world pages)
+<slug>/data.json         baked data (data/world pages), from tools/bake/* with provenance fields (source, license, baked/retrieved, input)
+data-src/                raw inputs for bakes + README with the origin and licence of each file
 topics/<slug>.md         the source topic
 ```
 All asset paths are relative so the site works under `/<repo>/` on GitHub Pages. Pages sit one folder below the repo root
@@ -128,4 +142,4 @@ All asset paths are relative so the site works under `/<repo>/` on GitHub Pages.
 
 ## Not available yet
 Dropdown or select control; more than ~3 toggle options; free pointer-drag of scene objects (Play type); video or GIF
-capture; baked-data helpers (arrive with the Data/GIS milestone); per-label custom positioning in screen space.
+capture; per-label custom positioning in screen space.

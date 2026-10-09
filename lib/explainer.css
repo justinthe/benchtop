@@ -65,6 +65,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 /* footer */
 .bt-foot { position: absolute; right: 20px; bottom: 16px; display: flex; gap: 14px; padding: 0 14px; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; backdrop-filter: blur(14px); align-items: center; font-size: 12px; color: var(--ink-dim); }
 .bt-slot:empty { display: none; }
+.bt-slot, .bt-slot a { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bt-foot a, .bt-foot button { color: var(--ink-dim); background: none; border: 0; padding: 8px 0; cursor: pointer; text-decoration: none; }
 .bt-foot a:hover, .bt-foot button:hover { color: var(--ink); }
 .bt-toast { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); padding: 8px 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -107,7 +108,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
   .bt-handle::before { content: ''; width: 40px; height: 4px; border-radius: 2px; background: var(--ink-dim); }
   .bt-foot { right: 12px; top: 12px; bottom: auto; }
   .bt::before { width: 100%; height: 170px; inset: 0 0 auto 0; background: linear-gradient(180deg, rgba(10,8,6,.6), transparent); }
-  .bt-foot .bt-src { display: none; }
+  .bt-foot .bt-src, .bt-foot .bt-slot { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
