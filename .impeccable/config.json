@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-10-14T01:26:29.624Z",
+        "reason": "project design system: Inter is the self-hosted body face in lib/fonts and lib/explainer.css, used by every explainer page; gallery matches it"
+      }
+    ]
+  }
+}

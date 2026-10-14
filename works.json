@@ -1,0 +1,106 @@
+[
+  {
+    "slug": "thermochemistry",
+    "title": "Heat Bench",
+    "kicker": "Why reactions get hot or cold",
+    "type": "explainer",
+    "tags": [
+      "chemistry",
+      "thermochemistry",
+      "energy",
+      "hess-law"
+    ],
+    "created": "2026-10-09",
+    "desc": "Why some reactions get hot and others get cold: pick a reaction, watch a calorimeter, and see the same energy on a Hess's-law diagram."
+  },
+  {
+    "slug": "moon-phases",
+    "title": "Moon Phases",
+    "kicker": "Why the Moon changes shape",
+    "type": "explainer",
+    "tags": [
+      "astronomy",
+      "light"
+    ],
+    "created": "2026-10-09",
+    "desc": "Why the Moon has phases: move the Moon round its orbit and see how much of its always-lit half faces Earth."
+  },
+  {
+    "slug": "planet-weights",
+    "title": "Planet Scales",
+    "kicker": "Same body, other worlds",
+    "type": "data",
+    "tags": [
+      "astronomy",
+      "gravity",
+      "data"
+    ],
+    "created": "2026-10-09",
+    "desc": "Your mass never changes, but your weight does. See the same body on all eight planets."
+  },
+  {
+    "slug": "spectacles",
+    "title": "Spectacle Bench",
+    "kicker": "Why glasses sharpen things",
+    "type": "explainer",
+    "tags": [
+      "optics",
+      "physics",
+      "eye",
+      "vision"
+    ],
+    "created": "2026-10-09",
+    "desc": "How spectacles work: change the eye length and the lens power and watch light focus on, in front of, or behind the retina."
+  },
+  {
+    "slug": "money-inflation",
+    "title": "Town Bank",
+    "kicker": "Why prices go up",
+    "type": "explainer",
+    "tags": [
+      "economics",
+      "money",
+      "inflation"
+    ],
+    "created": "2026-10-09",
+    "desc": "Why prices go up: pump new money into a small town's bank and watch the price tags in the bakery window climb."
+  },
+  {
+    "slug": "valley-flood",
+    "title": "Valley Flood",
+    "kicker": "Where rising water goes",
+    "type": "world",
+    "tags": [
+      "gis",
+      "terrain",
+      "hydrology"
+    ],
+    "created": "2026-10-09",
+    "desc": "Raise the water over a real East Tennessee landscape and watch it fill the lowest valley, wait behind a ridge, then spill over and claim far more land."
+  },
+  {
+    "slug": "pendulum",
+    "title": "Pendulum Lab",
+    "kicker": "Why swings keep time",
+    "type": "explainer",
+    "tags": [
+      "physics",
+      "mechanics"
+    ],
+    "created": "2026-10-08",
+    "desc": "Why a pendulum keeps time, and when it stops being exact."
+  },
+  {
+    "slug": "prism-room",
+    "title": "Prism Room",
+    "kicker": "Where white light splits",
+    "type": "explainer",
+    "tags": [
+      "physics",
+      "optics",
+      "light"
+    ],
+    "created": "2026-10-08",
+    "desc": "Why white light splits in a prism: refraction, minimum deviation, total internal reflection, and putting the colours back together."
+  }
+]

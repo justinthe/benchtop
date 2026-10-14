@@ -82,7 +82,7 @@ over the title, a hidden label). After the third, report exactly what remains. A
 
 ### 8. Capture
 - Thumbnail: `node tools/verify.mjs <slug> --thumb` (mode 1, default view), or `__bt.saveThumb()` from the best mode and view in the extension.
-- `node tools/meta.mjs <slug> "<Title>" "<Kicker>" <type> <tag,tag>` writes `meta.json` (hashes the topic).
+- `node tools/meta.mjs <slug> "<Title>" "<Kicker>" <type> <tag,tag>` writes `meta.json` (hashes the topic) and rebuilds `works.json`, the gallery list. Commit both.
 
 ### 9. Report (short)
 Path and local URL, the plan as built (including anything from the topic you did not build, and why), **model assumptions and simplifications**, test results, screenshots reviewed (modes
